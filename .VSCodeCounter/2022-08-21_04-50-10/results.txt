@@ -1,0 +1,35 @@
+Date : 2022-08-21 04:50:10
+Directory : d:\Main Proyects\Functions\functions\src
+Total : 11 files,  3058 codes, 439 comments, 286 blanks, all 3783 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| TypeScript |         11 |      3,058 |        439 |        286 |      3,783 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                      | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                         |         11 |      3,058 |        439 |        286 |      3,783 |
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                  | language   | code       | comment    | blank      | total      |
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+| d:\Main Proyects\Functions\functions\src\IStripe.ts       | TypeScript |         63 |         89 |          6 |        158 |
+| d:\Main Proyects\Functions\functions\src\Interfaces.ts    | TypeScript |         56 |         67 |         13 |        136 |
+| d:\Main Proyects\Functions\functions\src\auth.ts          | TypeScript |        234 |         48 |         28 |        310 |
+| d:\Main Proyects\Functions\functions\src\chats.ts         | TypeScript |        497 |         16 |         53 |        566 |
+| d:\Main Proyects\Functions\functions\src\config.ts        | TypeScript |         33 |          0 |          5 |         38 |
+| d:\Main Proyects\Functions\functions\src\employees.ts     | TypeScript |        665 |         63 |         45 |        773 |
+| d:\Main Proyects\Functions\functions\src\index.ts         | TypeScript |        966 |         69 |         75 |      1,110 |
+| d:\Main Proyects\Functions\functions\src\main.ts          | TypeScript |        114 |         11 |         15 |        140 |
+| d:\Main Proyects\Functions\functions\src\notifications.ts | TypeScript |        242 |         30 |         24 |        296 |
+| d:\Main Proyects\Functions\functions\src\storage.ts       | TypeScript |        116 |         31 |         11 |        158 |
+| d:\Main Proyects\Functions\functions\src\utils.ts         | TypeScript |         72 |         15 |         11 |         98 |
+| Total                                                     |            |      3,058 |        439 |        286 |      3,783 |
++-----------------------------------------------------------+------------+------------+------------+------------+------------+

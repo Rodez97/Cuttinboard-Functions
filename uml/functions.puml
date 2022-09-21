@@ -1,0 +1,94 @@
+@startuml
+interface IOrganizationKey {
+    +orgId: string
+    +ownerId?: string
+    +cusId?: string
+    +locKeys?: Record<string, ILocationKey>
+    +role?: RoleAccessLevels.OWNER | RoleAccessLevels.ADMIN
+}
+interface ILocationKey {
+    +locId: string
+    +role: RoleAccessLevels
+    +pos?: string[]
+    +ownerIsMember?: boolean
+}
+enum PrivacyLevel {
+    PUBLIC
+    PRIVATE
+    POSITIONS
+}
+enum RoleAccessLevels {
+    OWNER
+    ADMIN
+    GENERAL_MANAGER
+    MANAGER
+    STAFF
+}
+interface IEmployee extends ICuttinboardUser {
+    +id: string
+    +preferredName?: string
+    +emergencyContact?: { name?: string; phoneNumber: string; }
+    +contactComments?: string
+    +role?: RoleAccessLevels.OWNER | RoleAccessLevels.ADMIN
+    +expoToolsTokens?: string[]
+    +isOwner?: boolean
+    +organizationId: string
+    +locations?: Record<string, IEmployeeLocation>
+}
+interface ICuttinboardUser {
+    +avatar?: string
+    +name: string
+    +lastName: string
+    +email: string
+    +phoneNumber?: string
+    +userDocuments?: Record<string, string>
+    +birthDate?: firestore.FieldValue
+    +customerId?: string
+    +subscriptionId?: string
+}
+interface CustomerData {
+    +metadata: { firebaseUID: string; }
+    +email?: string
+}
+interface Price {
+    +active: boolean
+    +currency: string
+    +unit_amount: number
+    +description: string
+    +type: "one_time" | "recurring"
+    +interval: "day" | "month" | "week" | "year"
+    +interval_count: number
+    +trial_period_days: number
+}
+interface Product {
+    +active: boolean
+    +name: string
+    +description: string
+    +role: string
+    +images: string[]
+    +prices?: Price[]
+}
+interface Subscription {
+    +metadata: { [name: string]: string; }
+    +stripeLink: string
+    +role: string
+    +quantity: number
+    +items: Stripe.SubscriptionItem[]
+    +product: firestore.DocumentReference<firestore.DocumentData>
+    +price: firestore.DocumentReference<firestore.DocumentData>
+    +prices: firestore.DocumentReference<firestore.DocumentData>[]
+    +status: "active" | "canceled" | "incomplete" | "incomplete_expired" | "past_due" | "trialing" | "unpaid"
+    +cancel_at_period_end: boolean
+    +created: firestore.Timestamp
+    +current_period_start: firestore.Timestamp
+    +current_period_end: firestore.Timestamp
+    +ended_at: firestore.Timestamp
+    +cancel_at: firestore.Timestamp
+    +canceled_at: firestore.Timestamp
+    +trial_start: firestore.Timestamp
+    +trial_end: firestore.Timestamp
+    +pending_update?: boolean
+    +latest_invoice?: string
+    +default_payment_method: string | Stripe.PaymentMethod
+}
+@enduml
