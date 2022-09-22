@@ -12,7 +12,7 @@ export default functions.firestore
     // inicializar el lote de actualizaciones.
     const batch = firestore().batch();
     // Obtener los datos del usuario después del cambio
-    const { customerId, subscriptionId, ...afterEmployeeData } =
+    const { customerId, subscriptionId, paymentMethods, ...afterEmployeeData } =
       change.after.data();
     // Actualizar la información del usuario para cada locación a la que pertenece y añadirla al lote de actualizaciones (batch)
     const locationsEmpRef = await firestore()
