@@ -142,42 +142,38 @@ export const deleteProductOrPrice = async (
 };
 
 export async function attachPaymentMethod(paymentMethod: Stripe.PaymentMethod) {
-  // Get customer's UID from Firestore
-  const customersSnap = await firestore()
-    .collection(MainVariables.customersCollectionPath)
-    .where("customerId", "==", paymentMethod.customer)
-    .get();
-  if (customersSnap.size !== 1) {
-    throw new Error("User not found!");
-  }
-
   try {
+    // Get customer's UID from Firestore
+    const customersSnap = await firestore()
+      .collection(MainVariables.customersCollectionPath)
+      .where("customerId", "==", paymentMethod.customer)
+      .get();
+    if (customersSnap.size !== 1) {
+      throw new Error("User not found!");
+    }
     await customersSnap.docs[0].ref.update({
-      paymentMethods: FirebaseFirestore.FieldValue.arrayUnion(paymentMethod.id),
+      paymentMethods: firestore.FieldValue.arrayUnion(paymentMethod.id),
     });
   } catch (error) {
-    throw new Error("Error updating payment methods");
+    throw error;
   }
 }
 
 export async function detachPaymentMethod(paymentMethod: Stripe.PaymentMethod) {
-  // Get customer's UID from Firestore
-  const customersSnap = await firestore()
-    .collection(MainVariables.customersCollectionPath)
-    .where("customerId", "==", paymentMethod.customer)
-    .get();
-  if (customersSnap.size !== 1) {
-    throw new Error("User not found!");
-  }
-
   try {
+    // Get customer's UID from Firestore
+    const customersSnap = await firestore()
+      .collection(MainVariables.customersCollectionPath)
+      .where("customerId", "==", paymentMethod.customer)
+      .get();
+    if (customersSnap.size !== 1) {
+      throw new Error("User not found!");
+    }
     await customersSnap.docs[0].ref.update({
-      paymentMethods: FirebaseFirestore.FieldValue.arrayRemove(
-        paymentMethod.id
-      ),
+      paymentMethods: firestore.FieldValue.arrayRemove(paymentMethod.id),
     });
   } catch (error) {
-    throw new Error("Error updating payment methods");
+    throw error;
   }
 }
 

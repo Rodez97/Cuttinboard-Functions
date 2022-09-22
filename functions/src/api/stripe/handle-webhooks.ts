@@ -1,4 +1,4 @@
-import { https } from "firebase-functions";
+import { https, logger } from "firebase-functions";
 import Stripe from "stripe";
 import MainVariables from "../../config";
 import {
@@ -125,6 +125,7 @@ export default https.onRequest(async (req: https.Request, resp) => {
           break;
       }
     } catch (error) {
+      logger.error(error);
       resp.json({
         error: "Webhook handler failed. View function logs in Firebase.",
       });
