@@ -4,11 +4,11 @@ import MainVariables from "../../config";
 import {
   createProductRecord,
   deleteProductOrPrice,
-  insertInvoiceRecord,
   insertPriceRecord,
   insertTaxRateRecord,
   manageSubscriptionStatusChange,
-  updatePaymentMethodRecord,
+  attachPaymentMethod,
+  detachPaymentMethod,
 } from "../../services/stripe";
 
 const stripe = new Stripe(MainVariables.stripeSecretKey, {
@@ -65,21 +65,8 @@ export default https.onRequest(async (req: https.Request, resp) => {
     "customer.subscription.deleted",
     "tax_rate.created",
     "tax_rate.updated",
-    "invoice.paid",
-    "invoice.payment_succeeded",
-    "invoice.payment_failed",
-    "invoice.upcoming",
-    "invoice.updated",
-    "invoice.marked_uncollectible",
-    "invoice.payment_action_required",
-    "payment_intent.processing",
-    "payment_intent.succeeded",
-    "payment_intent.canceled",
-    "payment_intent.payment_failed",
     "payment_method.attached",
-    "payment_method.automatically_updated",
     "payment_method.detached",
-    "payment_method.updated",
   ]);
   let event: Stripe.Event;
 
@@ -124,46 +111,15 @@ export default https.onRequest(async (req: https.Request, resp) => {
         case "customer.subscription.created":
           await onSubChange(event);
           break;
-        case "checkout.session.completed":
-          // const checkoutSession = event.data
-          //   .object as Stripe.Checkout.Session;
-          // const subscriptionId = checkoutSession.subscription as string;
-          // await manageSubscriptionStatusChange(
-          //   subscriptionId,
-          //   checkoutSession.customer as string,
-          //   checkoutSession.mode === "subscription" &&
-          //     checkoutSession.payment_status === "paid"
-          // );
-          // if (checkoutSession.tax_id_collection?.enabled) {
-          //   const customersSnap = await firestore()
-          //     .collection("Users")
-          //     .where("customerId", "==", checkoutSession.customer as string)
-          //     .get();
-          //   if (customersSnap.size === 1) {
-          //     customersSnap.docs[0].ref.set(
-          //       { customer_details: checkoutSession.customer_details! },
-          //       {
-          //         merge: true,
-          //       }
-          //     );
-          //   }
-          // }
-          break;
-        case "invoice.payment_failed":
-        case "invoice.paid":
-        case "invoice.payment_succeeded":
-        case "invoice.upcoming":
-        case "invoice.updated":
-        case "invoice.marked_uncollectible":
-        case "invoice.payment_action_required":
-          const invoice = event.data.object as Stripe.Invoice;
-          await insertInvoiceRecord(invoice);
-          break;
         case "payment_method.attached":
-        case "payment_method.automatically_updated":
-        case "payment_method.updated":
-          const paymentMethod = event.data.object as Stripe.PaymentMethod;
-          await updatePaymentMethodRecord(paymentMethod, stripe);
+          const attachedPaymentMethod = event.data
+            .object as Stripe.PaymentMethod;
+          await attachPaymentMethod(attachedPaymentMethod);
+          break;
+        case "payment_method.detached":
+          const detachedPaymentMethod = event.data
+            .object as Stripe.PaymentMethod;
+          await detachPaymentMethod(detachedPaymentMethod);
           break;
         default:
           break;

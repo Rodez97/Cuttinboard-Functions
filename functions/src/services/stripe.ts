@@ -122,37 +122,6 @@ export const insertTaxRateRecord = async (
     .set(taxRateData);
 };
 
-/**
- * Add invoice objects to Cloud Firestore.
- */
-export const insertInvoiceRecord = async (invoice: Stripe.Invoice) => {
-  // Get customer's UID from Firestore
-  const customersSnap = await firestore()
-    .collection(MainVariables.customersCollectionPath)
-    .where("customerId", "==", invoice.customer)
-    .get();
-  if (customersSnap.size !== 1) {
-    throw new Error("User not found!");
-  }
-
-  if (invoice.status === "deleted" || invoice.status === "void") {
-    await firestore()
-      .collection("Users")
-      .doc(customersSnap.docs[0].id)
-      .collection("invoices")
-      .doc(invoice.id)
-      .delete();
-  } else {
-    // Write to invoice to a subcollection on the subscription doc.
-    await firestore()
-      .collection("Users")
-      .doc(customersSnap.docs[0].id)
-      .collection("invoices")
-      .doc(invoice.id)
-      .set(invoice);
-  }
-};
-
 export const deleteProductOrPrice = async (
   pr: Stripe.Product | Stripe.Price
 ) => {
@@ -172,33 +141,44 @@ export const deleteProductOrPrice = async (
   }
 };
 
-export async function updatePaymentMethodRecord(
-  paymentMethod: Stripe.PaymentMethod,
-  stripe: Stripe
-) {
-  const customer = await stripe.customers.retrieve(
-    paymentMethod.customer as string
-  );
-  if (customer.deleted) {
-    return;
+export async function attachPaymentMethod(paymentMethod: Stripe.PaymentMethod) {
+  // Get customer's UID from Firestore
+  const customersSnap = await firestore()
+    .collection(MainVariables.customersCollectionPath)
+    .where("customerId", "==", paymentMethod.customer)
+    .get();
+  if (customersSnap.size !== 1) {
+    throw new Error("User not found!");
   }
-  const newDefaultPaymentMethod =
-    customer.invoice_settings.default_payment_method;
 
-  if (!newDefaultPaymentMethod) {
-    return;
+  try {
+    await customersSnap.docs[0].ref.update({
+      paymentMethods: FirebaseFirestore.FieldValue.arrayUnion(paymentMethod.id),
+    });
+  } catch (error) {
+    throw new Error("Error updating payment methods");
   }
-  const custSubs = await stripe.subscriptions.list({
-    limit: 1,
-    customer: customer.id,
-  });
+}
 
-  if (custSubs.data.length === 0) {
-    return;
+export async function detachPaymentMethod(paymentMethod: Stripe.PaymentMethod) {
+  // Get customer's UID from Firestore
+  const customersSnap = await firestore()
+    .collection(MainVariables.customersCollectionPath)
+    .where("customerId", "==", paymentMethod.customer)
+    .get();
+  if (customersSnap.size !== 1) {
+    throw new Error("User not found!");
   }
-  await stripe.subscriptions.update(custSubs.data[0].id, {
-    default_payment_method: newDefaultPaymentMethod as string,
-  });
+
+  try {
+    await customersSnap.docs[0].ref.update({
+      paymentMethods: FirebaseFirestore.FieldValue.arrayRemove(
+        paymentMethod.id
+      ),
+    });
+  } catch (error) {
+    throw new Error("Error updating payment methods");
+  }
 }
 
 /**
