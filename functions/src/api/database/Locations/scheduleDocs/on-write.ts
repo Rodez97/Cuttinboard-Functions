@@ -2,11 +2,11 @@ import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import isoWeek from "dayjs/plugin/isoWeek";
-import Expo, { ExpoPushMessage } from "expo-server-sdk";
 import { database, FirebaseError, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
-import { chunk, uniq } from "lodash";
-import { sendExpoChunkNotifications } from "../../../../services/expo";
+import { uniq } from "lodash";
+import MainVariables from "../../../../config";
+import { sendNotificationToUids } from "../../../../services/oneSignal";
 dayjs.extend(isoWeek);
 dayjs.extend(advancedFormat);
 dayjs.extend(customParseFormat);
@@ -70,56 +70,27 @@ export default functions.firestore
     }
     const { name: locationName, organizationId } = locatioData;
 
-    const targetEmployeesDocuments = chunk(targetUsersIds, 10).map(
-      (targetUser) =>
-        firestore()
-          .collection("Organizations")
-          .doc(organizationId)
-          .collection("employees")
-          .where(firestore.FieldPath.documentId(), "in", targetUser)
-          .get()
-    );
-    const tedResponse = await Promise.all(targetEmployeesDocuments);
-    const targetUsers = tedResponse.map((res) => res.docs).flat();
-
-    const messages: ExpoPushMessage[] = [];
     const realtimeNotifications: { [key: string]: any } = {};
-    const notificationId = `sch_${scheduleDocId}`;
-    for (const targetUser of targetUsers) {
-      const { id } = targetUser;
-      const { expoToolsTokens } = targetUser.data();
+    for (const targetUser of targetUsersIds) {
       realtimeNotifications[
-        `users/${id}/notifications/${organizationId}/locations/${locationId}/sch/${scheduleDocId}`
+        `users/${targetUser}/notifications/${organizationId}/locations/${locationId}/sch/${scheduleDocId}`
       ] = database.ServerValue.increment(1);
-      if (!expoToolsTokens) {
-        continue;
-      }
-      for (const token of expoToolsTokens) {
-        if (!Expo.isExpoPushToken(token)) {
-          functions.logger.error(
-            `Push token ${token} is not a valid Expo push token`
-          );
-          continue;
-        }
-        messages.push({
-          to: token,
-          title: `📅 Schedule updated`,
-          sound: "default",
-          body: `${locationName}`,
-          data: {
-            organizationId,
-            locationId,
-            id: notificationId,
-            type: "schedule",
-          },
-          channelId: "Schedule",
-        });
-      }
     }
 
     try {
       await database().ref().update(realtimeNotifications);
-      await sendExpoChunkNotifications(messages);
+      await sendNotificationToUids({
+        include_external_user_ids: targetUsersIds,
+        app_id: MainVariables.oneSignalAppId,
+        contents: {
+          en: `Your schedule has been updated in ${locationName}`,
+          es: `Su horario ha sido actualizado en ${locationName}`,
+        },
+        headings: {
+          en: `📅 Schedule updated`,
+          es: `📅 Horario actualizado`,
+        },
+      });
     } catch (error) {
       const { code, message } = error as FirebaseError;
       throw new functions.https.HttpsError(

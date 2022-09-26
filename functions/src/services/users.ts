@@ -10,9 +10,11 @@ export async function getUserExpoTokens(userId: string) {
     return [];
   }
   const tokens: string[] = [];
-  for (const doc of userTokens.docs) {
-    const { expoToken } = doc.data();
-    tokens.push(expoToken);
-  }
+  userTokens.forEach((doc) => {
+    const expoToken = doc.get("expoToken");
+    if (expoToken) {
+      tokens.push(expoToken);
+    }
+  });
   return tokens;
 }

@@ -2,7 +2,7 @@ import { storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 
 export default functions.database
-  .ref("/chatMessages/{organizationId}/{chatId}/{messageId}")
+  .ref("/directMessages/{chatId}/{messageId}")
   .onDelete(async (snapshot, context) => {
     try {
       if (snapshot.child("uploaded").val() === true) {

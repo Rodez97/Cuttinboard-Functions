@@ -18,6 +18,9 @@ const MainVariables = {
   firebaseCuttinboardAccessToken: "CN4Mbb7McCD0zEOxWk9Z2-hi0_E8kZnO2sDTYhu2",
   transactionalEmailsApiApiKey:
     "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",
+  oneSignalAppKey: "N2M1ODdmMzEtNmM5ZS00ODk5LTg2NmMtYzg0MWYyZTIzODZl",
+  oseSignalUserAuthKey: "Yzc0NzAwMTQtOWIzMC00YmEzLWExODgtM2M0YWY1MmEyYjk0",
+  oneSignalAppId: "867241bc-8690-41a5-a051-000db9b7c136",
 };
 
 export const CREDENTIALS = {

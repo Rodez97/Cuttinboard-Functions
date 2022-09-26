@@ -28,6 +28,10 @@ export default functions.firestore
       }
     }
 
+    batch.update(firestore().collection("Users").doc(employeeId), {
+      organizations: firestore.FieldValue.arrayRemove(organizationId),
+    });
+
     try {
       await batch.commit();
       await database().ref().update(updates);
