@@ -19,6 +19,7 @@ export const sendNotificationToUids = async (notification: {
     const response = await axios.request(options);
     logger.log(response.status);
   } catch (error) {
+    logger.error(error);
     throw error;
   }
 };
