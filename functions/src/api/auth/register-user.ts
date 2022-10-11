@@ -14,7 +14,7 @@ export default https.onCall(async (data) => {
 
   try {
     const cuttinboardUser = await auth().createUser({
-      displayName: name,
+      displayName: `${name} ${lastName}`,
       email,
       password,
     });

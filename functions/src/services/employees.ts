@@ -6,7 +6,6 @@ import PrivacyLevel from "../models/PrivacyLevel";
 import RoleAccessLevels from "../models/RoleAccessLevels";
 import { checkIfUserExistsByEmail } from "./auth";
 import { sendWelcomeEmail } from "./emails";
-import { sendAddedToLocationNotification } from "./expo";
 import { getUserExpoTokens } from "./users";
 
 export const updateEmployeeConversations = async (
@@ -70,7 +69,11 @@ export const updateEmployeeConversations = async (
     updates[
       `conversations/${organizationId}/${locationId}/${oldConv.id}/members/${employeeId}`
     ] = null;
+    updates[
+      `users/${employeeId}/notifications/organizations/${organizationId}/locations/${locationId}/conv/${oldConv.id}`
+    ] = null;
   }
+
   // ! New
   const newConversationsQuery = chunk(newLocations, 10).map((locChunk) =>
     firestore()
@@ -136,7 +139,11 @@ export const updateEmployeeConversations = async (
       updates[
         `conversations/${organizationId}/${locationId}/${posConv.id}/members/${employeeId}`
       ] = null;
-    } else if (!isAlreadyMember && haveToBeMember) {
+      updates[
+        `users/${employeeId}/notifications/organizations/${organizationId}/locations/${locationId}/conv/${posConv.id}`
+      ] = null;
+    }
+    if (!isAlreadyMember && haveToBeMember) {
       batch.update(posConv.ref, {
         members: firestore.FieldValue.arrayUnion(employeeId),
       });
@@ -232,9 +239,9 @@ export const inviteEmployee = async (
     .get();
   const employeeSnapData = employeeSnap.data();
   if (employeeSnap.exists && employeeSnapData) {
-    const { name, expoToolsTokens, role } = employeeSnapData;
+    const { name, role: existentRole } = employeeSnapData;
 
-    if (typeof role === "number" && role <= 1) {
+    if (typeof existentRole === "number" && existentRole <= 1) {
       return { status: "CANT_ADD_ORG_EMP", employeeId: userExists.uid };
     }
 
@@ -253,12 +260,6 @@ export const inviteEmployee = async (
           },
         },
         { merge: true }
-      );
-      await sendAddedToLocationNotification(
-        expoToolsTokens ?? [],
-        locationName,
-        organizationId,
-        locationId
       );
       await sendWelcomeEmail(email, name, 3, {
         NAME: name,
@@ -316,12 +317,6 @@ export const inviteEmployee = async (
       .collection("employees")
       .doc(userExists.uid)
       .set(newEmployeeToAdd, { merge: true });
-    await sendAddedToLocationNotification(
-      expoToolsTokens ?? [],
-      locationName,
-      organizationId,
-      locationId
-    );
     await sendWelcomeEmail(email, name, 3, {
       NAME: name,
       LOCATIONNAME: locationName,

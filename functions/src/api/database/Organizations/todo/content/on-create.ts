@@ -59,7 +59,7 @@ export default functions.firestore
     try {
       const updates: { [key: string]: any } = {};
       updates[
-        `users/${assignedTo}/notifications/${organizationId}/locations/${locationId}/task/${todoId}`
+        `users/${assignedTo}/notifications/organizations/${organizationId}/locations/${locationId}/task/${todoId}`
       ] = database.ServerValue.increment(1);
 
       await database().ref().update(updates);

@@ -25,16 +25,18 @@ export default functions.firestore
       .collectionGroup("employees")
       .where("id", "==", uid)
       .get();
-    for (const { ref } of locationsEmpSnap.docs) {
+
+    locationsEmpSnap.forEach(({ ref }) => {
       // Referencia al documento de empleados de la locación
       batch.update(ref, afterEmployeeData);
-    }
+    });
 
     if (
       change.before.get("name") !== afterEmployeeData.name ||
       change.before.get("lastName") !== afterEmployeeData.lastName
     ) {
-      // Actualizar avatar de los chats en los que es miembro
+      const fullName = `${afterEmployeeData.name} ${afterEmployeeData.lastName}`;
+
       const directMessagesSnap = await firestore()
         .collection("DirectMessages")
         .orderBy(`members.${uid}`)
@@ -45,7 +47,7 @@ export default functions.firestore
           dmSnap.ref,
           {
             members: {
-              [uid]: `${afterEmployeeData.name} ${afterEmployeeData.lastName}`,
+              [uid]: fullName,
             },
           },
           { merge: true }

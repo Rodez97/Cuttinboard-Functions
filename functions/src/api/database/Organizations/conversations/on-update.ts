@@ -2,6 +2,9 @@ import { database } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { difference } from "lodash";
 
+/**
+ * Comprobar si hay cambios en los miembros de la conversación para eliminarlos o añadirlos a Realtime Database.
+ */
 export default functions.firestore
   .document("Organizations/{organizationId}/conversations/{conversationId}")
   .onUpdate(async (change, context) => {
@@ -29,7 +32,7 @@ export default functions.firestore
         `conversations/${organizationId}/${locationId}/${conversationId}/members/${oldMem}`
       ] = null;
       updates[
-        `users/${oldMem}/notifications/${locationId}/conv_${conversationId}`
+        `users/${oldMem}/notifications/organizations/${organizationId}/locations/${locationId}/conv`
       ] = null;
     }
 

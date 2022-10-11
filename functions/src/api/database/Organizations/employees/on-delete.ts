@@ -16,7 +16,9 @@ export default functions.firestore
         batch.update(firestore().collection("Locations").doc(loc), {
           members: firestore.FieldValue.arrayRemove(employeeId),
         });
-        updates[`users/${employeeId}/notifications/${loc}`] = null;
+        updates[
+          `users/${employeeId}/notifications/organizations/${organizationId}/locations/${loc}`
+        ] = null;
       }
     }
 

@@ -50,7 +50,9 @@ export default functions.firestore
       batch.update(firestore().collection("Locations").doc(locId), {
         members: firestore.FieldValue.arrayRemove(employeeId),
       });
-      updates[`users/${employeeId}/notifications/${locId}`] = null;
+      updates[
+        `users/${employeeId}/notifications/organizations/${organizationId}/locations/${locId}`
+      ] = null;
     }
     for (const [locId] of newLocations) {
       batch.update(firestore().collection("Locations").doc(locId), {

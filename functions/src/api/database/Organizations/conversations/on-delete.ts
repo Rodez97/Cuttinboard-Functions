@@ -1,6 +1,9 @@
 import { database, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 
+/**
+ * En caso de eliminar una conversación, limpiar los mensajes y la lista de miembros de Realtime Database
+ */
 export default functions.firestore
   .document("Organizations/{organizationId}/conversations/{conversationId}")
   .onDelete(async (change, context) => {
@@ -19,7 +22,7 @@ export default functions.firestore
     if (members) {
       for (const member of members) {
         updates[
-          `users/${member}/notifications/${locationId}/conv_${conversationId}`
+          `users/${member}/notifications/organizations/${organizationId}/locations/${locationId}/conv`
         ] = null;
       }
     }

@@ -11,9 +11,14 @@ export default functions.firestore
       throw new Error("Missing locationId");
     }
 
-    const membersObject = (members as string[] | undefined)?.reduce<
-      Record<string, string>
-    >((memRecord, id) => ({ ...memRecord, [id]: id }), {});
+    if (!members) {
+      return;
+    }
+
+    const membersObject = (members as string[]).reduce<Record<string, string>>(
+      (memRecord, id) => ({ ...memRecord, [id]: id }),
+      {}
+    );
 
     try {
       await database()

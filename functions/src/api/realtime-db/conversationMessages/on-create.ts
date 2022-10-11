@@ -27,25 +27,31 @@ export default functions.database
 
     const members = Object.keys(membersSnap.val());
 
+    if (!members.length) {
+      return;
+    }
+
     const {
       sender: { id: senderId, name: senderName },
       message,
-      notificationData: { locationName },
+      locationName,
     } = newMessage;
+
+    const recipients = difference<string>(members, [senderId]);
 
     // Objeto con el que componer las actualizaciones a la RDB
     const realtimeNotifications: { [key: string]: any } = {};
 
-    for (const mem of difference(members, [senderId])) {
+    for (const recipient of recipients) {
       realtimeNotifications[
-        `users/${mem}/notifications/${organizationId}/locations/${locationId}/conv/${chatId}`
+        `users/${recipient}/notifications/organizations/${organizationId}/locations/${locationId}/conv/${chatId}`
       ] = database.ServerValue.increment(1);
     }
 
     try {
       await database().ref().update(realtimeNotifications);
       await sendNotificationToUids({
-        include_external_user_ids: difference(members, [senderId]),
+        include_external_user_ids: recipients,
         app_id: MainVariables.oneSignalAppId,
         contents: {
           en: message,
