@@ -1,10 +1,10 @@
 import { database, FirebaseError, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { differenceBy, isEqual } from "lodash";
+import EmployeeLocation from "../../../../models/EmployeeLocation";
 import LocationKey from "../../../../models/LocationKey";
 import OrganizationKey from "../../../../models/OrganizationKey";
 import { updateUserClaims } from "../../../../services/auth";
-import { updateEmployeeConversations } from "../../../../services/employees";
 
 export default functions.firestore
   .document("/Organizations/{organizationId}/employees/{employeeId}")
@@ -19,10 +19,10 @@ export default functions.firestore
 
     const batch = firestore().batch();
 
-    const beforeLocKeys: [string, boolean | LocationKey][] = bLocations
+    const beforeLocKeys: [string, boolean | EmployeeLocation][] = bLocations
       ? Object.entries(bLocations)
       : [];
-    const afterLocKeys: [string, boolean | LocationKey][] = locations
+    const afterLocKeys: [string, boolean | EmployeeLocation][] = locations
       ? Object.entries(locations)
       : [];
 
@@ -39,8 +39,8 @@ export default functions.firestore
     );
 
     function isEmployee(
-      locations: Record<string, boolean | LocationKey>
-    ): locations is Record<string, LocationKey> {
+      locations: Record<string, boolean | EmployeeLocation>
+    ): locations is Record<string, EmployeeLocation> {
       return role === "employee";
     }
 
@@ -67,7 +67,11 @@ export default functions.firestore
       }>(
         (acc, [locId, empLoc]) => ({
           ...acc,
-          [locId]: { locId, role: empLoc.role, pos: empLoc.pos },
+          [locId]: {
+            locId,
+            role: empLoc.role,
+            pos: empLoc.pos ? JSON.stringify(empLoc.pos) : undefined,
+          },
         }),
         {}
       );
@@ -82,12 +86,6 @@ export default functions.firestore
     try {
       await batch.commit();
       await database().ref().update(updates);
-      await updateEmployeeConversations(
-        organizationId,
-        employeeId,
-        bLocations,
-        locations
-      );
       await updateUserClaims(employeeId, organizationKey);
     } catch (error) {
       const { code, message } = error as FirebaseError;

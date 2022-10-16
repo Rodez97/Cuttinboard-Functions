@@ -1,4 +1,4 @@
-import { FirebaseError, firestore } from "firebase-admin";
+import { database, FirebaseError, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { chunk } from "lodash";
 import Stripe from "stripe";
@@ -33,6 +33,8 @@ export default functions.firestore
 
     const { members, organizationId, subItemId, supervisors } = change.data();
 
+    const updates: { [key: string]: any } = {};
+
     const employeesRef = firestore()
       .collection("Organizations")
       .doc(organizationId)
@@ -48,23 +50,15 @@ export default functions.firestore
       }
     }
 
-    const appsElements = [
-      "notes",
-      "todo",
-      "storage",
-      "conversations",
-      "directMessages",
-    ];
+    const appsElements = ["notes", "todo", "storage", "conversations"];
 
-    for await (const appsElement of appsElements) {
+    for await (const appElement of appsElements) {
       const appsRef = firestore()
         .collection("Organizations")
         .doc(organizationId)
-        .collection(appsElement);
+        .collection(appElement);
       const apps = await appsRef.where("locationId", "==", locationId).get();
-      for (const app of apps.docs) {
-        batch.delete(app.ref);
-      }
+      apps.forEach((app) => batch.delete(app.ref));
     }
 
     const empRequests = chunk(members, 10).map((membersChunk) =>
@@ -76,6 +70,10 @@ export default functions.firestore
     const employees = employeesResponse.flatMap((response) => response.docs);
 
     for (const employee of employees) {
+      updates[
+        `users/${employee.id}/notifications/organizations/${organizationId}/locations/${locationId}`
+      ] = null;
+
       const { role, locations } = employee.data();
       if (typeof role === "number" && role <= RoleAccessLevels.ADMIN) {
         batch.set(
@@ -125,6 +123,7 @@ export default functions.firestore
         action: "set",
       });
       await batch.commit();
+      await database().ref().update(updates);
       await firestore().recursiveDelete(change.ref);
     } catch (error) {
       const { code, message } = error as FirebaseError;

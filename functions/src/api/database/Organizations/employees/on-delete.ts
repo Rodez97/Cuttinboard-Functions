@@ -1,7 +1,6 @@
 import { database, FirebaseError, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { clearUserClaims } from "../../../../services/auth";
-import { updateEmployeeConversations } from "../../../../services/employees";
 
 export default functions.firestore
   .document("/Organizations/{organizationId}/employees/{employeeId}")
@@ -37,12 +36,6 @@ export default functions.firestore
     try {
       await batch.commit();
       await database().ref().update(updates);
-      await updateEmployeeConversations(
-        organizationId,
-        employeeId,
-        locations,
-        null
-      );
       await clearUserClaims([employeeId], organizationId);
     } catch (error) {
       const { code, message } = error as FirebaseError;

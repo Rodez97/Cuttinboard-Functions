@@ -1,7 +1,9 @@
 import { firestore } from "firebase-admin";
-import LocationKey from "./LocationKey";
+import RoleAccessLevels from "./RoleAccessLevels";
 
-type EmployeeLocation = LocationKey & {
+type EmployeeLocation = {
+  locId: string;
+  role: RoleAccessLevels;
   wagePerPosition?: Record<string, number>;
   employeeDataComments?: string;
   mainPosition?: string;
@@ -15,6 +17,7 @@ type EmployeeLocation = LocationKey & {
    * Siendo dueño, también cuenta como empleado?
    */
   ownerIsMember?: boolean;
+  pos?: string[];
 };
 
 export default EmployeeLocation;

@@ -1,6 +1,5 @@
 import { FirebaseError, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
-import { updateEmployeeConversations } from "../../../../services/employees";
 
 export default functions.firestore
   .document("/Organizations/{organizationId}/employees/{employeeId}")
@@ -24,14 +23,6 @@ export default functions.firestore
 
     try {
       await batch.commit();
-      if (locations) {
-        await updateEmployeeConversations(
-          organizationId,
-          employeeId,
-          null,
-          locations
-        );
-      }
     } catch (error) {
       const { code, message } = error as FirebaseError;
       throw new functions.https.HttpsError(

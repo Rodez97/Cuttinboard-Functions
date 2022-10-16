@@ -6,7 +6,7 @@ import RoleAccessLevels from "./RoleAccessLevels";
 type LocationKey = {
   locId: string;
   role: RoleAccessLevels;
-  pos?: string[];
+  pos?: string;
 };
 
 export default LocationKey;

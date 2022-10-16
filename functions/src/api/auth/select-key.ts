@@ -39,7 +39,7 @@ export default https.onCall(async (organizationId, context) => {
       .withConverter(EmployeeConverter)
       .get();
     const employeeProfile = employeeProfileSnap.data();
-    if (!employeeProfile) {
+    if (!employeeProfileSnap.exists || !employeeProfile) {
       throw new https.HttpsError(
         "not-found",
         "The organization key does not exist"
@@ -54,7 +54,11 @@ export default https.onCall(async (organizationId, context) => {
       }>(
         (acc, [locId, empLoc]) => ({
           ...acc,
-          [locId]: { locId, role: empLoc.role, pos: empLoc.pos },
+          [locId]: {
+            locId,
+            role: empLoc.role,
+            pos: empLoc.pos ? JSON.stringify(empLoc.pos) : undefined,
+          },
         }),
         {}
       );
