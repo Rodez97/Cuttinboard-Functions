@@ -1,17 +1,25 @@
+import { IMessage } from "@cuttinboard-solutions/types-helpers";
 import { storage } from "firebase-admin";
 import * as functions from "firebase-functions";
+import { handleError } from "../../../services/handleError";
+import { parseStoragePathFromUrl } from "../../../services/helpers";
 
 export default functions.database
   .ref(
     "/conversationMessages/{organizationId}/{locationId}/{chatId}/{messageId}"
   )
-  .onDelete(async (snapshot, context) => {
+  .onDelete(async (snapshot) => {
+    const message: IMessage | null = snapshot.val();
+
+    if (!message || !message.image) return;
+
     try {
-      if (snapshot.child("uploaded").val() === true) {
-        const filePath = snapshot.child("attachment").child("source").val();
-        await storage().bucket().file(filePath).delete();
-      }
+      // Parse the storage path from the URL
+      const { path } = parseStoragePathFromUrl(message.image);
+
+      // Delete the file from the storage
+      await storage().bucket().file(path).delete();
     } catch (error) {
-      throw new Error("An error occurred deleting this chat");
+      handleError(error);
     }
   });

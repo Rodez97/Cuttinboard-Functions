@@ -1,33 +1,39 @@
 {
-  "name": "functions",
+  "name": "firestore-functions-cuttinboard",
   "scripts": {
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "generate-readme": "firebase ext:info .. --markdown > ../README.md"
   },
   "engines": {
-    "node": "14"
+    "node": "16"
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@cuttinboard-solutions/types-helpers": "^1.0.45",
     "@sendinblue/client": "^3.2.2",
     "axios": "^0.24.0",
     "better-firebase-functions": "^4.0.0",
-    "dayjs": "^1.11.5",
-    "expo-server-sdk": "^3.6.0",
-    "firebase-admin": "^10.3.0",
-    "firebase-functions": "^3.24.0",
+    "dayjs": "^1.11.7",
+    "expo-server-sdk": "^3.7.0",
+    "firebase-admin": "^11.5.0",
+    "firebase-functions": "^4.2.1",
     "lodash": "^4.17.21",
-    "short-uuid": "^4.2.0",
-    "stripe": "^8.222.0"
+    "short-uuid": "^4.2.2",
+    "stripe": "^8.222.0",
+    "yup": "^1.0.2"
   },
   "devDependencies": {
+    "@types/node": "^18.13.0",
     "@types/request": "^2.48.8",
-    "firebase-functions-test": "^0.2.0",
-    "typescript": "^3.8.0"
+    "firebase-functions-test": "^3.0.0",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.5.0",
+    "typescript": "^4.9.5"
   },
   "private": true
 }

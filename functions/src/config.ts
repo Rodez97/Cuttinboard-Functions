@@ -1,8 +1,8 @@
-import * as admin from "firebase-admin";
+import { ServiceAccount } from "firebase-admin";
 
 const test = false; //
 
-const MainVariables = {
+export const MainVariables = {
   stripeSecretKey: test
     ? "rk_test_51KZnSWCYVoOESVglcSUOV89oUz3WqZIspCh4V1xDjEj2WYcdeFwrsOXwTGXcMuDcBGKyUpmCIUqSjP3ajkYRKs5D00swwKlqpZ"
     : "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",
@@ -37,6 +37,27 @@ export const CREDENTIALS = {
   auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
   client_x509_cert_url:
     "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-gzxd1%40cuttinboard-2021.iam.gserviceaccount.com",
-} as admin.ServiceAccount;
+} as ServiceAccount;
 
-export default MainVariables;
+export const BOARDS = ["notes", "storage"];
+
+export const STORAGE_LIMIT = 5e9;
+
+export default {
+  stripeSecretKey: process.env.STRIPE_API_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  productsCollectionPath: process.env.PRODUCTS_COLLECTION,
+  customersCollectionPath: process.env.CUSTOMERS_COLLECTION,
+  stripeConfigCollectionPath: process.env.STRIPE_CONFIG_COLLECTION,
+  syncUsersOnCreate: process.env.SYNC_USERS_ON_CREATE === "Sync",
+  autoDeleteUsers: process.env.DELETE_STRIPE_CUSTOMERS === "Auto delete",
+  messagingSenderId: process.env.STRIPE_API_KEY,
+  apiKey: process.env.FIREBASE_API_KEY,
+  messagingKey: process.env.FIREBASE_MESSAGING_KEY,
+  firebaseCuttinboardAccessToken: process.env.FIREBASE_CUTTINBOARD_ACCESS_TOKEN,
+  transactionalEmailsApiApiKey: process.env.TRANSACTIONAL_EMAILS_API_KEY,
+  oneSignalAppKey: process.env.ONE_SIGNAL_APP_KEY,
+  oseSignalUserAuthKey: process.env.ONE_SIGNAL_USER_AUTH_KEY,
+  oneSignalAppId: process.env.ONE_SIGNAL_APP_ID,
+  STORAGE_LIMIT: process.env.STORAGE_LIMIT,
+};

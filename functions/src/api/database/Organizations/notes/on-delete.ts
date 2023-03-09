@@ -1,24 +1,14 @@
-import { FirebaseError, firestore } from "firebase-admin";
+import { firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
+import { handleError } from "../../../../services/handleError";
 
 export default functions.firestore
-  .document(`/Organizations/{organizationId}/notes/{boardId}`)
+  .document(`/{coll}/{parentId}/notes/{boardId}`)
   .onDelete(async (board) => {
-    const drawerData = board.data();
-    const { locationId } = drawerData;
-
-    if (!locationId) {
-      return;
-    }
-
-    // Borrar todas las subcolecciones de esta pizarra / app
     try {
+      // Delete the board's subcollections
       await firestore().recursiveDelete(board.ref);
     } catch (error) {
-      const { code, message } = error as FirebaseError;
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        JSON.stringify({ code, message })
-      );
+      handleError(error);
     }
   });

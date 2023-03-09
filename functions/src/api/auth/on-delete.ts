@@ -1,45 +1,65 @@
-import { database, FirebaseError, firestore, storage } from "firebase-admin";
-import { auth, https } from "firebase-functions";
+import { firestore } from "firebase-admin";
+import { auth, logger } from "firebase-functions";
+import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
+import { deleteFiles } from "../../services/deleteFiles";
+import { updateUserMetadata } from "../../services/updateUserMetadata";
 
+/**
+ * When a user is deleted, delete their data from the locations and organizations
+ * they are associated with.
+ * - Remove the user's profile from the organization's employee collection.
+ * - Check if any 1-1 chats need to be deleted or have the user's ID removed as a member.
+ * - Delete the user's global profile and all its subcollections.
+ * - Delete the user's files from storage.
+ * - Update the metadata for the user's deleted state.
+ */
 export default auth.user().onDelete(async (user) => {
   // Initialize the update batch.
-  const batch = firestore().batch();
+  const bulkWriter = firestore().bulkWriter();
   // Reference to user document.
-  const userDocRef = firestore().collection("Users").doc(user.uid);
-  // Delete the user's profile for each location to which it belongs and add it to the batch of updates (batch)
-  const locationsEmpRef = await firestore()
+  const userDocRef = firestore()
+    .collection("Users")
+    .doc(user.uid)
+    .withConverter(cuttinboardUserConverter);
+
+  // Get the user's employee profiles.
+  const employeeProfiles = await firestore()
     .collectionGroup("employees")
     .where("id", "==", user.uid)
     .get();
-  for (const { ref } of locationsEmpRef.docs) {
-    // Reference to the employee document of the location
-    batch.delete(ref);
-  }
+
+  // Remove the user's profile from all organizations where they are an employee and add it to the update batch.
+  employeeProfiles.forEach((ep) => {
+    bulkWriter.delete(ep.ref);
+  });
+
+  // Check if any 1-1 chats need to be deleted or have the user's ID removed as a member.
+  const directMessageSnapshots = await firestore()
+    .collection("DirectMessages")
+    .where("membersList", "array-contains", user.uid)
+    .get();
+
+  directMessageSnapshots.forEach((chatSnapshot) => {
+    const membersList: string[] = chatSnapshot.get("membersList");
+    if (membersList.length === 1) {
+      bulkWriter.delete(chatSnapshot.ref);
+    } else {
+      bulkWriter.update(chatSnapshot.ref, {
+        membersList: firestore.FieldValue.arrayRemove(user.uid),
+      });
+    }
+  });
 
   try {
-    // Execute the batch of operations to delete the profiles in the different locations
-    await batch.commit();
-    // Delete the user's global profile and all its subcollections
-    await firestore().recursiveDelete(userDocRef);
-    // Clear user resources from storage
-    await storage()
-      .bucket()
-      .deleteFiles({
-        prefix: `users/${user.uid}`,
-      });
-    // Update the database in real time to notify the client to force the update.
-    const metadataRef = database().ref(`users/${user.uid}/metadata`);
-    // Set the update time to the current UTC timestamp.
-    // This will be captured on the client to force a token refresh.
-    await metadataRef.set({
-      refreshTime: new Date().getTime(),
-      deleteAccount: true,
-    });
+    // Delete the user's global profile and all its subcollections.
+    await firestore().recursiveDelete(userDocRef, bulkWriter);
   } catch (error) {
-    const { code, message } = error as FirebaseError;
-    throw new https.HttpsError(
-      "failed-precondition",
-      JSON.stringify({ code, message })
-    );
+    logger.error("Error deleting user profile", error);
   }
+
+  // Delete files from the user's storage bucket.
+  await deleteFiles(`users/${user.uid}`);
+
+  // Update the metadata for the user's deleted state.
+  await updateUserMetadata(user.uid, true);
 });

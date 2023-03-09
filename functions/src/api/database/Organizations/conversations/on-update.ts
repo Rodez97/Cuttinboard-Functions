@@ -1,31 +1,33 @@
+import { IConversation } from "@cuttinboard-solutions/types-helpers";
 import { database } from "firebase-admin";
 import * as functions from "firebase-functions";
-import { isEqual } from "lodash";
-import { createAccessObject } from "../../../../services/createAccessObject";
+import { handleError } from "../../../../services/handleError";
+import { stringArrayToMap } from "../../../../services/stringArrayToMap";
 
-/**
- * Comprobar si hay cambios en los miembros de la conversación para eliminarlos o añadirlos a Realtime Database.
- */
 export default functions.firestore
-  .document("Organizations/{organizationId}/conversations/{conversationId}")
+  .document("Locations/{locationId}/conversations/{conversationId}")
   .onUpdate(async (change, context) => {
-    const { organizationId, conversationId } = context.params;
-    const { accessTags: bAccessTags } = change.before.data();
-    const { locationId, accessTags, privacyLevel } = change.after.data();
+    const { locationId, conversationId } = context.params;
 
-    if (isEqual(bAccessTags, accessTags)) {
-      return;
-    }
-
-    const accessTagsObject = createAccessObject(accessTags, privacyLevel);
+    const { organizationId, members, muted, position, privacyLevel, hosts } =
+      change.after.data() as IConversation;
 
     try {
+      // Set the access object in Realtime Database
       await database()
         .ref(
-          `conversations/${organizationId}/${locationId}/${conversationId}/accessTags`
+          `conversations/${organizationId}/${locationId}/${conversationId}/access`
         )
-        .set(accessTagsObject);
+        .update({
+          // Convert the members and muted arrays into maps, where the keys are the elements of the array and the values are true
+          members: members ? stringArrayToMap(members) : null,
+          muted: muted ? stringArrayToMap(muted) : null,
+          hosts: hosts ? stringArrayToMap(hosts) : null,
+          position: position ?? null,
+          privacyLevel,
+        });
     } catch (error) {
-      throw new Error("An error occurred updating this conversation");
+      // If there is an error then throw an error
+      handleError(error);
     }
   });

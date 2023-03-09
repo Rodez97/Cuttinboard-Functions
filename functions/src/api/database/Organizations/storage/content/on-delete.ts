@@ -1,21 +1,17 @@
+import { ICuttinboard_File } from "@cuttinboard-solutions/types-helpers";
 import { storage } from "firebase-admin";
 import * as functions from "firebase-functions";
+import { handleError } from "../../../../../services/handleError";
 
 export default functions.firestore
-  .document(
-    `/Organizations/{organizationId}/storage/{drawerId}/content/{fileId}`
-  )
+  .document(`/{coll}/{parentId}/files/{drawerId}/content/{fileId}`)
   .onDelete(async (deletedFile) => {
-    const fileData = deletedFile.data();
-    const { storagePath } = fileData;
-
-    if (!storagePath) {
-      return;
-    }
+    const { storagePath } = deletedFile.data() as ICuttinboard_File;
 
     try {
+      // Delete the file from the storage
       await storage().bucket().file(storagePath).delete();
     } catch (error) {
-      throw new Error("An error occurred while deleting the file");
+      handleError(error);
     }
   });

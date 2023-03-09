@@ -1,53 +1,70 @@
-import { FirebaseError, firestore } from "firebase-admin";
+import { ICuttinboardUser } from "@cuttinboard-solutions/types-helpers";
+import { firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
+import { directMessageConverter } from "../../../models/converters/directMessageConverter";
+import { handleError } from "../../../services/handleError";
+
 /**
- * Esta función se encarga de propagar los cambios realizados en la información del usuario
- * a su perfil de empleado en las diferentes locaciones a las que pertenece.
+ * Update employee data on the locations or organizations when the user profile is updated
  */
 export default functions.firestore
   .document(`/Users/{uid}`)
   .onUpdate(async (change, context) => {
-    // Extraer el id del usuario de los parámetros de la función
     const { uid } = context.params;
-    // inicializar el lote de actualizaciones.
     const batch = firestore().batch();
-    // Obtener los datos del usuario después del cambio
+
+    // Extract the properties that we do not want to propagate to the locations or organizations
     const {
       customerId,
       subscriptionId,
       paymentMethods,
       organizations,
-      avatar,
       ...afterEmployeeData
-    } = change.after.data();
-    // Actualizar la información del usuario para cada locación a la que pertenece y añadirla al lote de actualizaciones (batch)
-    const locationsEmpSnap = await firestore()
-      .collectionGroup("employees")
-      .where("id", "==", uid)
-      .get();
+    } = change.after.data() as ICuttinboardUser;
 
-    locationsEmpSnap.forEach(({ ref }) => {
-      // Referencia al documento de empleados de la locación
-      batch.update(ref, afterEmployeeData);
-    });
+    if (organizations) {
+      organizations.forEach((org: string) => {
+        // Update the employee profile on the locations
+        batch.update(
+          firestore()
+            .collection("Organizations")
+            .doc(org)
+            .collection("employees")
+            .doc(uid),
+          afterEmployeeData
+        );
+      });
+    }
+
+    const { name, lastName, avatar } = change.before.data() as ICuttinboardUser;
 
     if (
-      change.before.get("name") !== afterEmployeeData.name ||
-      change.before.get("lastName") !== afterEmployeeData.lastName
+      name !== afterEmployeeData.name ||
+      lastName !== afterEmployeeData.lastName ||
+      avatar !== afterEmployeeData.avatar
     ) {
+      // ! If the name, lastName or avatar has changed then update the DM chats where the employee is involved
+
       const fullName = `${afterEmployeeData.name} ${afterEmployeeData.lastName}`;
 
+      // Get the DM chats where the employee is involved
       const directMessagesSnap = await firestore()
         .collection("DirectMessages")
-        .orderBy(`members.${uid}`)
+        .where("membersList", "array-contains", uid)
+        .withConverter(directMessageConverter)
         .get();
 
+      // Update the employee's name and avatar on the DM chats
       directMessagesSnap.forEach((dmSnap) =>
         batch.set(
           dmSnap.ref,
           {
             members: {
-              [uid]: fullName,
+              [uid]: {
+                id: uid,
+                name: fullName,
+                avatar: afterEmployeeData.avatar,
+              },
             },
           },
           { merge: true }
@@ -56,13 +73,9 @@ export default functions.firestore
     }
 
     try {
-      // Ejecutar el lote de cambios correspondiente
+      // Commit the batch
       await batch.commit();
     } catch (error) {
-      const { code, message } = error as FirebaseError;
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        JSON.stringify({ code, message })
-      );
+      handleError(error);
     }
   });

@@ -1,23 +1,35 @@
-import { FirebaseError, firestore } from "firebase-admin";
-import { https } from "firebase-functions";
+import { firestore } from "firebase-admin";
+import { https, logger } from "firebase-functions";
 import short from "short-uuid";
 import Stripe from "stripe";
-import MainVariables from "../../../config";
-import RoleAccessLevels from "../../../models/RoleAccessLevels";
-import { inviteEmployee } from "../../../services/employees";
+import { MainVariables } from "../../../config";
+import { inviteEmployee } from "../../../services/inviteEmployee";
+import {
+  DefaultScheduleSettings,
+  ILocation,
+  ILocationAddress,
+  ILocationLimits,
+  RoleAccessLevels,
+} from "@cuttinboard-solutions/types-helpers";
+import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
+import * as yup from "yup";
 
-const stripe = new Stripe(MainVariables.stripeSecretKey, {
-  apiVersion: "2020-08-27",
-  // Register extension as a Stripe plugin
-  // https://stripe.com/docs/building-plugins#setappinfo
-  appInfo: {
-    name: "Cuttinboard-Firebase",
-    version: "0.1",
-  },
-});
+interface ICreateLocationData {
+  location: {
+    name: string;
+    intId?: string;
+    address?: ILocationAddress;
+  };
+  generalManager?: {
+    name: string;
+    lastName: string;
+    email: string;
+  };
+}
 
-export default https.onCall(async (data, context) => {
+export default https.onCall(async (data: ICreateLocationData, context) => {
   const { auth } = context;
+
   // Checking that the user is authenticated.
   if (!auth) {
     // Throwing an HttpsError so that the client gets the error details.
@@ -26,84 +38,146 @@ export default https.onCall(async (data, context) => {
       "The function must be called while authenticated!"
     );
   }
-  const { location, generalManager } = data;
-  const { uid, email } = auth.token;
 
-  if (!email || !uid || !location) {
-    return;
+  // Location creation data
+  const { location, generalManager } = data;
+
+  const { uid } = auth.token;
+
+  if (!location || !location.name) {
+    // If the required data is not provided then return an error.
+    throw new https.HttpsError(
+      "invalid-argument",
+      "The function must be called with valid data!"
+    );
   }
 
   // Get user data
   const userDocument = (
-    await firestore().collection("Users").doc(uid).get()
+    await firestore()
+      .collection("Users")
+      .doc(uid)
+      .withConverter(cuttinboardUserConverter)
+      .get()
   ).data();
 
   if (!userDocument) {
+    // If the user does not exist then return an error.
     throw new https.HttpsError(
-      "failed-precondition",
-      "The user doesn't exist in Firestore!"
+      "not-found",
+      "The user document does not exist!"
     );
   }
+
   const { customerId, subscriptionId } = userDocument;
+
+  if (!customerId || !subscriptionId) {
+    // If the user does not have a customer id or subscription id then return an error.
+    throw new https.HttpsError(
+      "failed-precondition",
+      "The user does not have a subscription!"
+    );
+  }
 
   const batch = firestore().batch();
 
-  if (!customerId || !subscriptionId) {
-    throw new https.HttpsError(
-      "failed-precondition",
-      "The user is not a customer!"
-    );
-  }
+  // Initialize the stripe client
+  const stripe = new Stripe(MainVariables.stripeSecretKey, {
+    apiVersion: "2020-08-27",
+    // Register extension as a Stripe plugin
+    // https://stripe.com/docs/building-plugins#setappinfo
+    appInfo: {
+      name: "Cuttinboard-Firebase",
+      version: "0.1",
+    },
+  });
 
   try {
+    // Get the subscription
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ["items.data.price.product"],
     });
+
+    // Get the metadata from the product of the subscription.
+    // * Note: The metadata contains the limits of the subscription plan.
     const { metadata } = subscription.items.data[0].price
       .product as Stripe.Product;
 
+    // Generate a random id for the location
     const locationId = short.generate();
+
+    // Create the location document reference
     const locationRef = firestore().collection("Locations").doc(locationId);
-    const locationMain = {
+
+    // Create the location data
+    const locationMain: ILocation = {
       ...location,
       subscriptionStatus: subscription.status,
-      employeesCount: 0,
       storageUsed: 0,
-      limits: metadata,
+      limits: metadata as unknown as ILocationLimits,
       organizationId: uid,
       subscriptionId,
       subItemId: subscription.items.data[0].id,
       supervisors: [],
+      members: [],
+      id: locationId,
+      createdAt: new Date().getTime(),
+      refPath: locationRef.path,
+      settings: {
+        positions: [],
+        schedule: DefaultScheduleSettings,
+      },
     };
+
+    // Set the location data
     batch.set(locationRef, locationMain, { merge: true });
 
-    await batch.commit();
+    // Create initial data for the location
+    const locationChecklist = await firestore()
+      .collection("Templates")
+      .doc("locationChecklist")
+      .get();
 
-    // Add general manager employee data if it exists
-    if (
-      generalManager?.email &&
-      generalManager?.name &&
-      generalManager?.lastName
-    ) {
-      await inviteEmployee(
-        generalManager.name,
-        generalManager.lastName,
-        generalManager.email,
+    if (locationChecklist.exists) {
+      const locationChecklistRef = firestore()
+        .collection("Locations")
+        .doc(locationId)
+        .collection("globals")
+        .doc("dailyChecklists");
+
+      batch.set(locationChecklistRef, {
+        ...locationChecklist.data(),
         locationId,
-        uid,
-        RoleAccessLevels.GENERAL_MANAGER,
-        [],
-        "",
-        {}
-      );
+      });
     }
 
+    // Commit the batch
+    await batch.commit();
+
+    // If the general manager data is provided then create the employee.
+    if (generalManager) {
+      // Validate the general manager data
+      const schema = yup.object().shape({
+        name: yup.string().required(),
+        lastName: yup.string().required(),
+        email: yup.string().email().required(),
+      });
+
+      const validData = await schema.validate(generalManager);
+
+      // Create the employee
+      await inviteEmployee({
+        ...validData,
+        locationId,
+        organizationId: uid,
+        role: RoleAccessLevels.GENERAL_MANAGER,
+      });
+    }
+
+    // Return the data to the client.
     return { customerId, subscriptionId, organizationId: uid };
-  } catch (error) {
-    const { code, message } = error as FirebaseError;
-    throw new https.HttpsError(
-      "failed-precondition",
-      JSON.stringify({ code, message })
-    );
+  } catch (error: any) {
+    logger.error(error);
+    throw new https.HttpsError("unknown", error.message);
   }
 });

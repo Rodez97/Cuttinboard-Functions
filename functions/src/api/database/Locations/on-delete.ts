@@ -1,135 +1,103 @@
-import { database, FirebaseError, firestore } from "firebase-admin";
+import { database, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
-import { chunk } from "lodash";
-import Stripe from "stripe";
-import MainVariables from "../../../config";
-import RoleAccessLevels from "../../../models/RoleAccessLevels";
+import { deleteFiles } from "../../../services/deleteFiles";
+import { difference } from "lodash";
+import { GrpcStatus } from "firebase-admin/firestore";
+import { ILocation } from "@cuttinboard-solutions/types-helpers";
 
 /**
- * Borrar todas las subcolecciones y recursos de almacenamiento de una locación
- * cuando esta es cancelada/eliminada **definitivamente** por el usuario dueño de la misma.
+ * Clean the location data from the organization
  */
 export default functions.firestore
   .document(`/Locations/{locationId}`)
   .onDelete(async (change, context) => {
-    const stripe = new Stripe(MainVariables.stripeSecretKey, {
-      apiVersion: "2020-08-27",
-      // Register extension as a Stripe plugin
-      // https://stripe.com/docs/building-plugins#setappinfo
-      appInfo: {
-        name: "Cuttinboard-Firebase",
-        version: "0.1",
-      },
-    });
-
-    if (!stripe) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Stripe Api not initialized"
-      );
-    }
-
     const { locationId } = context.params;
 
-    const { members, organizationId, subItemId, supervisors } = change.data();
+    // Get the location data
+    const { organizationId, supervisors, members } = change.data() as ILocation;
 
-    const updates: { [key: string]: any } = {};
+    // Initialize the organization document reference
+    const updates: { [key: string]: null } = {};
 
+    // Initialize the updates batch
+    const bulkWriter = firestore().bulkWriter();
+
+    bulkWriter.onWriteError((error) => {
+      if (error.code === GrpcStatus.NOT_FOUND) {
+        functions.logger.log(
+          "Document does not exist: ",
+          error.documentRef.path
+        );
+        return false;
+      }
+      if (error.failedAttempts < 10) {
+        return true;
+      } else {
+        return false;
+      }
+    });
+
+    // Organization employees reference
     const employeesRef = firestore()
       .collection("Organizations")
       .doc(organizationId)
       .collection("employees");
 
-    const batch = firestore().batch();
+    const membersNotSupervisors = difference(members ?? [], supervisors ?? []);
 
-    if (supervisors) {
-      for (const supervisor of supervisors) {
-        batch.update(employeesRef.doc(supervisor), {
-          supervisingLocations: firestore.FieldValue.arrayRemove(locationId),
-        });
-      }
-    }
+    /**
+     * Remove the location from each supervisor
+     */
+    supervisors?.forEach((supervisor) => {
+      bulkWriter.update(employeesRef.doc(supervisor), {
+        supervisingLocations: firestore.FieldValue.arrayRemove(locationId),
+        locationsList: firestore.FieldValue.arrayRemove(locationId),
+      });
 
-    const appsElements = ["notes", "todo", "storage", "conversations"];
-
-    for await (const appElement of appsElements) {
-      const appsRef = firestore()
-        .collection("Organizations")
-        .doc(organizationId)
-        .collection(appElement);
-      const apps = await appsRef.where("locationId", "==", locationId).get();
-      apps.forEach((app) => batch.delete(app.ref));
-    }
-
-    const empRequests = chunk(members, 10).map((membersChunk) =>
-      employeesRef
-        .where(firestore.FieldPath.documentId(), "in", membersChunk)
-        .get()
-    );
-    const employeesResponse = await Promise.all(empRequests);
-    const employees = employeesResponse.flatMap((response) => response.docs);
-
-    for (const employee of employees) {
       updates[
-        `users/${employee.id}/notifications/organizations/${organizationId}/locations/${locationId}`
+        `users/${supervisor}/notifications/organizations/${organizationId}/locations/${locationId}`
       ] = null;
-
-      const { role, locations } = employee.data();
-      if (typeof role === "number" && role <= RoleAccessLevels.ADMIN) {
-        batch.set(
-          employee.ref,
-          { locations: { [locationId]: firestore.FieldValue.delete() } },
-          { merge: true }
-        );
-        continue;
-      }
-      const locationsCount = locations ? Object.keys(locations).length : 0;
-      if (locationsCount === 1) {
-        batch.delete(employee.ref);
-      } else {
-        batch.set(
-          employee.ref,
-          { locations: { [locationId]: firestore.FieldValue.delete() } },
-          { merge: true }
-        );
-      }
-    }
-
-    const organizationSnap = await firestore()
-      .collection("Organizations")
-      .doc(organizationId)
-      .get();
-    const organizationData = organizationSnap.data();
-    if (!organizationData) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Missing organizationData"
-      );
-    }
-    const { locations } = organizationData;
-    if (!subItemId) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Missing subItemId"
-      );
-    }
-    batch.update(firestore().collection("Organizations").doc(organizationId), {
-      locations: locations ? Number(locations - 1) : 0,
     });
 
-    try {
-      await stripe.subscriptionItems.createUsageRecord(subItemId, {
-        quantity: locations ? Number(locations - 1) : 0,
-        action: "set",
+    /**
+     * Delete the data related to the location from each employee
+     */
+    membersNotSupervisors.forEach((member) => {
+      bulkWriter.update(employeesRef.doc(member), {
+        [`locations.${locationId}`]: firestore.FieldValue.delete(),
+        locationsList: firestore.FieldValue.arrayRemove(locationId),
       });
-      await batch.commit();
-      await database().ref().update(updates);
-      await firestore().recursiveDelete(change.ref);
+
+      updates[
+        `users/${member}/notifications/organizations/${organizationId}/locations/${locationId}`
+      ] = null;
+    });
+
+    // Decrease the locations count by one and update the organization
+    bulkWriter.update(
+      firestore().collection("Organizations").doc(organizationId),
+      {
+        locations: firestore.FieldValue.increment(-1),
+      }
+    );
+
+    try {
+      await firestore().recursiveDelete(change.ref, bulkWriter);
     } catch (error) {
-      const { code, message } = error as FirebaseError;
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        JSON.stringify({ code, message })
+      functions.logger.error(
+        "Error deleting location data from Firestore",
+        error
       );
+    }
+
+    await deleteFiles(
+      `organizations/${organizationId}/locations/${locationId}`
+    );
+
+    try {
+      // Apply the updates
+      await database().ref().update(updates);
+    } catch (error) {
+      functions.logger.error("Error deleting location data from RTDB", error);
     }
   });
