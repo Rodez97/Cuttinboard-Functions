@@ -1,28 +1,26 @@
-import PrivacyLevel from "../models/PrivacyLevel";
-
+/**
+ * Creates an access object for a conversation in Realtime Database.
+ * @param members The members of the conversation
+ * @param muted The muted members of the conversation
+ * @returns An object with the access tags and privacy level
+ */
 export function createAccessObject(
-  accessTags: string[],
-  privacyLevel: PrivacyLevel
+  members: string[] | undefined,
+  muted: string[] | undefined
 ) {
-  if (privacyLevel === PrivacyLevel.PUBLIC) {
-    return { isPublic: true };
-  }
+  // Create the access object
+  const accessObject: {
+    [key: string]: boolean;
+  } = {};
 
-  if (privacyLevel === PrivacyLevel.PRIVATE) {
-    return accessTags.reduce((acc, at) => {
-      return { acc, [at]: at };
-    }, {});
-  }
+  // Add the members to the access object
+  members?.forEach((member) => {
+    // Check if the member is muted
+    const isMuted = muted ? muted.includes(member) : false;
 
-  if (privacyLevel === PrivacyLevel.POSITIONS) {
-    const hosts = accessTags
-      .filter((at) => at.startsWith("hostId_"))
-      .reduce((acc, at) => {
-        return { acc, [at]: at.replace("hostId_", "") };
-      }, {});
-    const position = accessTags.filter((at) => !at.startsWith("hostId_"))[0];
-    return { ...hosts, position };
-  }
+    // Add the member to the access object
+    accessObject[member] = isMuted;
+  });
 
-  return {};
+  return accessObject;
 }

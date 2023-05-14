@@ -1,132 +1,104 @@
-import { FirebaseError, firestore } from "firebase-admin";
-import { https, logger } from "firebase-functions";
-import RoleAccessLevels from "../../../models/RoleAccessLevels";
-import { inviteEmployee, inviteSupervisor } from "../../../services/employees";
+import {
+  IOrganizationKey,
+  ManagerPermissions,
+  RoleAccessLevels,
+} from "@cuttinboard-solutions/types-helpers";
+import { inviteEmployee } from "../../../services/inviteEmployee";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+
+export interface EmployeeData {
+  name: string;
+  lastName: string;
+  email: string;
+  role:
+    | RoleAccessLevels.GENERAL_MANAGER
+    | RoleAccessLevels.MANAGER
+    | RoleAccessLevels.STAFF;
+  locationId?: string;
+  positions?: string[];
+  wagePerPosition?: Record<string, number>;
+  mainPosition?: string;
+  permissions?: ManagerPermissions;
+}
 
 /**
- * Añadir empleados a la locación
+ * Add a new employee to the organization or location
  */
-export default https.onCall(async (data, context) => {
-  const { auth } = context;
-  const {
-    locationId,
-    name,
-    lastName,
-    email,
-    role,
-    positions,
-    wagePerPosition,
-    mainPosition,
-    supervisingLocations,
-  } = data;
-  // Comprobando que el usuario está autenticado.
+export default onCall<EmployeeData>(async (request) => {
+  const { auth, data } = request;
+
   if (!auth) {
-    // Lanzar un HttpsError para que el cliente obtenga los detalles del error.
-    throw new https.HttpsError(
-      "failed-precondition",
-      "The function must be called while authenticated!"
+    // If the user is not authenticated then return an error
+    throw new HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
     );
   }
 
-  if (!name || !lastName || !email || !role) {
-    throw new https.HttpsError(
-      "failed-precondition",
-      "The function must be called correct data!"
+  // Employee registration data
+  const { locationId, name, lastName, email, role } = data;
+
+  if (!name || !lastName || !email || !role || !locationId) {
+    // If the required data is not provided then return an error
+    throw new HttpsError(
+      "invalid-argument",
+      "The function must be called with valid data. (name, lastName, email, role, locationId)"
     );
   }
 
   if (email === auth.token.email) {
-    return;
+    // If the user is trying to add himself then return an error
+    throw new HttpsError(
+      "invalid-argument",
+      "You can not add yourself as an employee."
+    );
   }
 
-  if (role === 1) {
-    // Check if the user who called the function is owner of an organization
-    const userOrg = await firestore()
-      .collection("Organizations")
-      .doc(auth.uid)
-      .get();
-    if (!userOrg.exists || userOrg.get("subscriptionStatus") === "canceled") {
-      return;
-    }
-    const addedBy = auth.token["name"] ?? auth.token.email;
-    try {
-      return await inviteSupervisor(
-        name,
-        lastName,
-        email,
-        auth.uid,
-        supervisingLocations,
-        addedBy
-      );
-    } catch (error) {
-      const { code, message } = error as FirebaseError;
-      throw new https.HttpsError(
-        "failed-precondition",
-        JSON.stringify({ code, message })
-      );
-    }
-  }
+  // Get the access key from the auth token.
+  const organizationKey: IOrganizationKey | undefined =
+    auth.token?.organizationKey;
 
-  const { organizationKey } = auth.token;
-  // Comprobar que el usuario posea la llave de la locación
   if (!organizationKey) {
-    // Lanzar un HttpsError para que el cliente obtenga los detalles del error.
-    throw new https.HttpsError(
-      "failed-precondition",
-      "Missing <organizationKey> auth claims"
+    // If the access key is not provided then return an error
+    throw new HttpsError(
+      "invalid-argument",
+      "The function must be called with a valid access key for this location."
     );
   }
 
-  const { role: myRole, locKeys, orgId } = organizationKey;
+  // Extract the access data from the access key for the user that is inviting the employee.
+  const { role: myRole, locId, orgId } = organizationKey;
 
-  if (!locationId) {
-    throw new https.HttpsError(
-      "failed-precondition",
-      "Missing <locationId> attribute"
+  if (locId !== locationId) {
+    // If the locationId provided does not match the locationId from the access key then return an error
+    throw new HttpsError(
+      "invalid-argument",
+      "The locationId provided does not match the locationId from the access key."
     );
   }
 
-  const getRole = (): RoleAccessLevels => {
-    if (typeof myRole === "number" && myRole <= RoleAccessLevels.ADMIN) {
-      return myRole;
-    }
-    return typeof locKeys?.[locationId]?.role === "number"
-      ? locKeys[locationId].role
-      : RoleAccessLevels.STAFF;
-  };
-
-  // Comprobar que el usuario tenga el rol necesario para ejecutar la función
-  if (getRole() > role) {
-    logger.error(
-      `Adding employee to ${locationId}`,
-      `My role is ${getRole()}`,
-      `The employee role is ${role}`,
-      "Org key:",
-      organizationKey
-    );
-    throw new https.HttpsError(
-      "failed-precondition",
-      "The user does not have the necessary role to execute the function"
+  if (myRole >= role) {
+    // If the role of the user that is inviting the employee is greater than the role of the employee then return an error
+    throw new HttpsError(
+      "permission-denied",
+      "You can not invite an employee with a higher or equal role than you."
     );
   }
 
-  try {
-    return await inviteEmployee(
-      name,
-      lastName,
-      email,
-      locationId,
-      orgId,
-      role,
-      positions ?? [],
-      mainPosition,
-      wagePerPosition
-    );
-  } catch (error) {
-    const { code, message } = error as FirebaseError;
-    throw new https.HttpsError(
-      "failed-precondition",
-      JSON.stringify({ code, message })
+  // Invite the employee
+  const result = await inviteEmployee({
+    ...data,
+    organizationId: orgId,
+    locationId,
+  });
+
+  if (result) {
+    return result;
+  } else {
+    // If the employee is already registered then return an error
+    throw new HttpsError(
+      "already-exists",
+      "There was an error inviting the employee."
     );
   }
 });

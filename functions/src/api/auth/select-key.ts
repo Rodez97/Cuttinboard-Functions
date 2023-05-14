@@ -1,88 +1,147 @@
-import { auth, database, FirebaseError, firestore } from "firebase-admin";
-import { https } from "firebase-functions";
-import { EmployeeConverter } from "../../models/Employee";
-import LocationKey from "../../models/LocationKey";
-import OrganizationKey from "../../models/OrganizationKey";
+import {
+  IOrganizationKey,
+  RoleAccessLevels,
+} from "@cuttinboard-solutions/types-helpers";
+import { auth, firestore } from "firebase-admin";
+import { employeeDocConverter } from "../../models/converters/employeeConverter";
+import { updateUserMetadata } from "../../services/updateUserMetadata";
+import { locationConverter } from "../../models/converters/locationConverter";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v1";
+
+interface SelectKeyData {
+  organizationId: string;
+  locationId: string;
+  timestamp: number;
+}
 
 /**
- * Select the Firestore key and add it to the custom Auth claims
- * @param {string} organizationId ID of the organization you want to select
- * @returns {IOrganizationKey} The selected key
+ * Select a key for a user to access a location or organization.
  */
-export default https.onCall(async (organizationId, context) => {
-  const { auth: authentication } = context;
+export default onCall<SelectKeyData>(async (event) => {
+  const { organizationId, locationId, timestamp } = event.data;
+  const authentication = event.auth;
 
+  // Check that the user is authenticated.
   if (!authentication) {
-    throw new https.HttpsError(
-      "unauthenticated",
-      "The function must be called while authenticated!"
-    );
-  }
-
-  // organizationId must be valid and type string
-  if (!organizationId || typeof organizationId !== "string") {
-    throw new https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
-      "Missing <organizationId>"
+      "The function must be called while authenticated."
     );
   }
 
+  // Organization ID is required and must be a string.
+  if (!organizationId || typeof organizationId !== "string") {
+    throw new HttpsError(
+      "invalid-argument",
+      "A valid organization ID is required as input to this function. The organization ID must be a string."
+    );
+  }
+
+  // Location ID is required and must be a string.
+  if (!locationId || typeof locationId !== "string") {
+    throw new HttpsError(
+      "invalid-argument",
+      "A valid location ID is required as input to this function. The location ID must be a string."
+    );
+  }
+
+  // Get the user's ID.
   const { uid } = authentication;
+
+  let organizationKey: IOrganizationKey | undefined;
 
   try {
     // Get the user's organization key
-    const employeeProfileSnap = await firestore()
-      .collection("Organizations")
-      .doc(organizationId)
-      .collection("employees")
-      .doc(uid)
-      .withConverter(EmployeeConverter)
+    const locationDocumentSnapshot = await firestore()
+      .collection("Locations")
+      .doc(locationId)
+      .withConverter(locationConverter)
       .get();
-    const employeeProfile = employeeProfileSnap.data();
-    if (!employeeProfileSnap.exists || !employeeProfile) {
-      throw new https.HttpsError(
-        "not-found",
-        "The organization key does not exist"
-      );
-    }
-    const { role, locations } = employeeProfile;
+    const locationData = locationDocumentSnapshot.data();
 
-    let locKeys;
-    if (role === "employee" && locations) {
-      locKeys = Object.entries(locations).reduce<{
-        [locId: string]: LocationKey;
-      }>(
-        (acc, [locId, empLoc]) => ({
-          ...acc,
-          [locId]: {
-            locId,
-            role: empLoc.role,
-            pos: empLoc.pos ? JSON.stringify(empLoc.pos) : undefined,
-          },
-        }),
-        {}
+    if (!locationData) {
+      // Throw an error if the user does not have access to the location
+      throw new HttpsError(
+        "failed-precondition",
+        "The location document does not exist in the database."
       );
     }
 
-    const organizationKey: OrganizationKey = {
-      orgId: organizationId,
-      role,
-      locKeys,
-    };
+    const { organizationId: locationOrganizationId, supervisors } =
+      locationData;
+
+    if (locationOrganizationId !== organizationId) {
+      // Throw an error if the user does not have access to the location
+      throw new HttpsError(
+        "failed-precondition",
+        "The organization ID does not match the location's organization ID."
+      );
+    }
+
+    if (locationOrganizationId === uid) {
+      // The user is the organization owner
+      organizationKey = {
+        role: RoleAccessLevels.OWNER,
+        orgId: organizationId,
+        locId: locationId,
+      };
+    } else if (supervisors && supervisors.includes(uid)) {
+      // The user is a supervisor
+      organizationKey = {
+        role: RoleAccessLevels.ADMIN,
+        orgId: organizationId,
+        locId: locationId,
+      };
+    } else {
+      // Get the user's location key
+      const employeeLocationProfilesSnap = await firestore()
+        .collection("Locations")
+        .doc(locationId)
+        .collection("employees")
+        .doc("employeesDocument")
+        .withConverter(employeeDocConverter)
+        .get();
+      const employeeLocationProfiles = employeeLocationProfilesSnap.data();
+
+      if (!employeeLocationProfiles) {
+        // Throw an error if the user does not have access to the location
+        throw new HttpsError(
+          "failed-precondition",
+          "The user does not have access to the location."
+        );
+      }
+
+      const employeeLocationProfile = employeeLocationProfiles.employees?.[uid];
+
+      if (!employeeLocationProfile) {
+        // Throw an error if the user does not have access to the location
+        throw new HttpsError(
+          "failed-precondition",
+          "The user does not have access to the location."
+        );
+      }
+
+      const { role, positions } = employeeLocationProfile;
+
+      organizationKey = {
+        role,
+        pos: positions,
+        orgId: organizationId,
+        locId: locationId,
+      };
+    }
 
     // Set the new key on the user's claims to grant access to the corresponding resources
     await auth().setCustomUserClaims(uid, { organizationKey });
 
-    // Update the database in real time to notify the client to force the update.
-    const metadataRef = database().ref(`users/${uid}/metadata`);
+    // Update the user's claims in the database
+    await updateUserMetadata({ uid, refreshTime: timestamp });
 
-    // Set the update time to the current UTC timestamp.
-    // This will be captured on the client to force a token refresh.
-    await metadataRef.set({ refreshTime: new Date().getTime() });
-
+    // Return the result to the client.
     return { organizationKey };
-  } catch (error) {
-    const { code, message } = error as FirebaseError;
-    throw new https.HttpsError("unknown", JSON.stringify({ code, message }));
+  } catch (error: any) {
+    logger.error(error);
+    throw new HttpsError("unknown", error.message);
   }
 });

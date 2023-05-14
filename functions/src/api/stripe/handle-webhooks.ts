@@ -1,6 +1,6 @@
-import { https, logger } from "firebase-functions";
 import Stripe from "stripe";
-import MainVariables from "../../config";
+import { MainVariables } from "../../config";
+import { handleError } from "../../services/handleError";
 import {
   createProductRecord,
   deleteProductOrPrice,
@@ -9,7 +9,10 @@ import {
   manageSubscriptionStatusChange,
   attachPaymentMethod,
   detachPaymentMethod,
+  deleteOrganization,
 } from "../../services/stripe";
+import { firestore } from "firebase-admin";
+import { HttpsError, onRequest } from "firebase-functions/v2/https";
 
 const stripe = new Stripe(MainVariables.stripeSecretKey, {
   apiVersion: "2020-08-27",
@@ -26,12 +29,30 @@ async function onSubChange(event: Stripe.Event) {
   const subId = subscription.id;
   const customerId = subscription.customer as string;
   const organizationId = subscription.metadata?.firebaseUID;
+  const status = subscription.status;
+
   if (!organizationId) {
-    return;
+    // If the organization ID is not present then throw an error
+    throw new HttpsError(
+      "invalid-argument",
+      "The organization ID is not present!"
+    );
   }
+
+  if (status === "incomplete" || status === "incomplete_expired") {
+    // If the subscription is incomplete or incomplete_expired then throw an error
+    throw new HttpsError(
+      "invalid-argument",
+      "The subscription is incomplete or incomplete_expired!"
+    );
+  }
+
+  if (status === "canceled" || event.type === "customer.subscription.deleted") {
+    await deleteOrganization(organizationId);
+  }
+
   switch (event.type) {
     case "customer.subscription.updated":
-    case "customer.subscription.deleted":
       await manageSubscriptionStatusChange(
         stripe,
         subId,
@@ -45,13 +66,13 @@ async function onSubChange(event: Stripe.Event) {
         subId,
         customerId,
         organizationId,
-        !["incomplete", "incomplete_expired"].includes(subscription.status)
+        true
       );
       break;
   }
 }
 
-export default https.onRequest(async (req: https.Request, resp) => {
+export default onRequest({ cors: [/stripe/] }, async (req, resp) => {
   const relevantEvents = new Set([
     "product.created",
     "product.updated",
@@ -67,6 +88,7 @@ export default https.onRequest(async (req: https.Request, resp) => {
     "tax_rate.updated",
     "payment_method.attached",
     "payment_method.detached",
+    "customer.deleted",
   ]);
   let event: Stripe.Event;
 
@@ -77,6 +99,7 @@ export default https.onRequest(async (req: https.Request, resp) => {
   try {
     event = stripe.webhooks.constructEvent(
       req.rawBody,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       req.headers["stripe-signature"]!,
       MainVariables.stripeWebhookSecret
     );
@@ -112,27 +135,42 @@ export default https.onRequest(async (req: https.Request, resp) => {
           await onSubChange(event);
           break;
         case "payment_method.attached":
-          const attachedPaymentMethod = event.data
-            .object as Stripe.PaymentMethod;
-          await attachPaymentMethod(attachedPaymentMethod);
+          await attachPaymentMethod(event.data.object as Stripe.PaymentMethod);
           break;
         case "payment_method.detached":
-          const detachedPaymentMethod = event.data
-            .object as Stripe.PaymentMethod;
-          await detachPaymentMethod(detachedPaymentMethod);
+          await detachPaymentMethod(event.data);
+          break;
+        case "customer.deleted":
+          await customerDeleted(event);
           break;
         default:
           break;
       }
     } catch (error) {
-      logger.error(error);
       resp.json({
         error: "Webhook handler failed. View function logs in Firebase.",
       });
-      return;
+      handleError(error);
     }
   }
 
   // Return a response to Stripe to acknowledge receipt of the event.
   resp.json({ received: true });
 });
+
+const customerDeleted = async (event: Stripe.Event) => {
+  const customer = event.data.object as Stripe.Customer;
+  const uid = customer.metadata?.firebaseUID;
+
+  if (!uid) {
+    // If the organization ID is not present then throw an error
+    throw new HttpsError(
+      "invalid-argument",
+      "The organization ID is not present!"
+    );
+  }
+  // Delete the customer from your database
+  await firestore().collection("Users").doc(uid).update({
+    customerId: firestore.FieldValue.delete(),
+  });
+};

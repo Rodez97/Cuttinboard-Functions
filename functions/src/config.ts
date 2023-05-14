@@ -1,14 +1,9 @@
-import * as admin from "firebase-admin";
+import { ServiceAccount } from "firebase-admin";
 
-const test = false; //
-
-const MainVariables = {
-  stripeSecretKey: test
-    ? "rk_test_51KZnSWCYVoOESVglcSUOV89oUz3WqZIspCh4V1xDjEj2WYcdeFwrsOXwTGXcMuDcBGKyUpmCIUqSjP3ajkYRKs5D00swwKlqpZ"
-    : "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",
-  stripeWebhookSecret: test
-    ? "whsec_WoKNSkXt1zhvbp8McX4YIp9rnrPD5KYm"
-    : "whsec_EgdRTgh9RH9CvgLsgwhxdiwyvXOkiFe5",
+export const MainVariables = {
+  stripeSecretKey:
+    "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",
+  stripeWebhookSecret: "whsec_B7g0lo60kMko72ndWK65MjlcCBdVmfxL",
   productsCollectionPath: "Products",
   customersCollectionPath: "Users",
   messagingSenderId: "286988124291",
@@ -21,6 +16,11 @@ const MainVariables = {
   oneSignalAppKey: "N2M1ODdmMzEtNmM5ZS00ODk5LTg2NmMtYzg0MWYyZTIzODZl",
   oseSignalUserAuthKey: "Yzc0NzAwMTQtOWIzMC00YmEzLWExODgtM2M0YWY1MmEyYjk0",
   oneSignalAppId: "867241bc-8690-41a5-a051-000db9b7c136",
+  stripeProductId: "prod_MINsulkDhsnMys",
+  stripePriceId: "price_1N1WbZCYVoOESVgl3qVWFKiQ",
+  scheduleChannelId: "fc5fd854-cd9f-4fe3-9d2d-cf873803f2f4",
+  messageBoardsChannelId: "b5ea2d2d-e156-40c7-9e72-bb9a4a6455c1",
+  directMessagesChannelId: "731773a1-2ae2-4e56-8fd3-494bb1056d66",
 };
 
 export const CREDENTIALS = {
@@ -37,6 +37,27 @@ export const CREDENTIALS = {
   auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
   client_x509_cert_url:
     "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-gzxd1%40cuttinboard-2021.iam.gserviceaccount.com",
-} as admin.ServiceAccount;
+} as ServiceAccount;
 
-export default MainVariables;
+export const BOARDS = ["notes", "files"];
+
+export const STORAGE_LIMIT = 5e9;
+
+export default {
+  stripeSecretKey: process.env.STRIPE_API_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  productsCollectionPath: process.env.PRODUCTS_COLLECTION,
+  customersCollectionPath: process.env.CUSTOMERS_COLLECTION,
+  stripeConfigCollectionPath: process.env.STRIPE_CONFIG_COLLECTION,
+  syncUsersOnCreate: process.env.SYNC_USERS_ON_CREATE === "Sync",
+  autoDeleteUsers: process.env.DELETE_STRIPE_CUSTOMERS === "Auto delete",
+  messagingSenderId: process.env.STRIPE_API_KEY,
+  apiKey: process.env.FIREBASE_API_KEY,
+  messagingKey: process.env.FIREBASE_MESSAGING_KEY,
+  firebaseCuttinboardAccessToken: process.env.FIREBASE_CUTTINBOARD_ACCESS_TOKEN,
+  transactionalEmailsApiApiKey: process.env.TRANSACTIONAL_EMAILS_API_KEY,
+  oneSignalAppKey: process.env.ONE_SIGNAL_APP_KEY,
+  oseSignalUserAuthKey: process.env.ONE_SIGNAL_USER_AUTH_KEY,
+  oneSignalAppId: process.env.ONE_SIGNAL_APP_ID,
+  STORAGE_LIMIT: process.env.STORAGE_LIMIT,
+};

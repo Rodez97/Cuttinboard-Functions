@@ -1,35 +1,57 @@
-import { auth, FirebaseError, firestore } from "firebase-admin";
-import { https } from "firebase-functions";
+import { auth, firestore } from "firebase-admin";
+import { isFirebaseError } from "../../services/errorCheck";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 
-export default https.onCall(async (data) => {
-  const { email, name, lastName, password } = data;
+interface RegisterUserRequest {
+  email: string;
+  name: string;
+  lastName: string;
+  password: string;
+}
 
-  // El parámetro data debe ser de tipo string y debe contener un valor
-  if (!email || !name || !lastName || !password) {
-    throw new https.HttpsError(
-      "invalid-argument",
-      "The function must be called with a valid email, name, lastName and password!"
-    );
+/**
+ * Register a new user.
+ */
+export default onCall<RegisterUserRequest>(
+  { cors: [/cuttinboard/] },
+  async (data) => {
+    const { email, name, lastName, password } = data.data;
+
+    // Check that the all the required fields are present.
+    if (!email || !name || !lastName || !password) {
+      throw new HttpsError(
+        "invalid-argument",
+        "The function must be called with all the required arguments."
+      );
+    }
+    // Lowercase the email address.
+    const loweredEmail = email.toLowerCase();
+
+    try {
+      // Get a reference to the Firebase Auth instance and the "Users" collection.
+      const authInstance = auth();
+      const usersCollection = firestore().collection("Users");
+
+      // Create the user.
+      const cuttinboardUser = await authInstance.createUser({
+        displayName: `${name} ${lastName}`,
+        email: loweredEmail,
+        password,
+      });
+      // Create the user document on firestore.
+      await usersCollection.doc(cuttinboardUser.uid).set({
+        name,
+        lastName,
+        email: loweredEmail,
+      });
+      // Return the user data.
+      return cuttinboardUser.uid;
+    } catch (error: any) {
+      if (isFirebaseError(error)) {
+        throw new HttpsError("failed-precondition", error.code);
+      } else {
+        throw new HttpsError("unknown", error?.message);
+      }
+    }
   }
-
-  try {
-    const cuttinboardUser = await auth().createUser({
-      displayName: `${name} ${lastName}`,
-      email,
-      password,
-    });
-    // Create the user document on firestore
-    await firestore()
-      .collection("Users")
-      .doc(cuttinboardUser.uid)
-      .set({ name, lastName, email });
-
-    return cuttinboardUser.uid;
-  } catch (error) {
-    const { code, message } = error as FirebaseError;
-    throw new https.HttpsError(
-      "failed-precondition",
-      JSON.stringify({ code, message })
-    );
-  }
-});
+);

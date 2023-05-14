@@ -1,9 +1,16 @@
+import {
+  ILocation,
+  LocationSubscriptionStatus,
+} from "@cuttinboard-solutions/types-helpers";
 import { firestore } from "firebase-admin";
+import { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { uniq } from "lodash";
 import Stripe from "stripe";
-import MainVariables from "../config";
+import { MainVariables } from "../config";
 import { Price, Product, Subscription, TaxRate } from "../models/IStripe";
+import { locationConverter } from "../models/converters/locationConverter";
 import { clearUserClaims } from "./auth";
+import { handleError } from "./handleError";
 
 export const stripeTimeToTimestamp = (time: number | null | undefined) =>
   time ? firestore.Timestamp.fromMillis(time * 1000) : null;
@@ -142,39 +149,35 @@ export const deleteProductOrPrice = async (
 };
 
 export async function attachPaymentMethod(paymentMethod: Stripe.PaymentMethod) {
-  try {
-    // Get customer's UID from Firestore
-    const customersSnap = await firestore()
-      .collection(MainVariables.customersCollectionPath)
-      .where("customerId", "==", paymentMethod.customer)
-      .get();
-    if (customersSnap.size !== 1) {
-      throw new Error("User not found!");
-    }
-    await customersSnap.docs[0].ref.update({
-      paymentMethods: firestore.FieldValue.arrayUnion(paymentMethod.id),
-    });
-  } catch (error) {
-    throw error;
+  // Get customer's UID from Firestore
+  const customersSnap = await firestore()
+    .collection(MainVariables.customersCollectionPath)
+    .where("customerId", "==", paymentMethod.customer)
+    .get();
+  if (customersSnap.size !== 1) {
+    throw new Error("User not found!");
   }
+  await customersSnap.docs[0].ref.update({
+    paymentMethods: firestore.FieldValue.arrayUnion(paymentMethod.id),
+  });
 }
 
-export async function detachPaymentMethod(paymentMethod: Stripe.PaymentMethod) {
-  try {
-    // Get customer's UID from Firestore
-    const customersSnap = await firestore()
-      .collection(MainVariables.customersCollectionPath)
-      .where("customerId", "==", paymentMethod.customer)
-      .get();
-    if (customersSnap.size !== 1) {
-      throw new Error("User not found!");
-    }
-    await customersSnap.docs[0].ref.update({
-      paymentMethods: firestore.FieldValue.arrayRemove(paymentMethod.id),
-    });
-  } catch (error) {
-    throw error;
+export async function detachPaymentMethod(eventData: Stripe.Event.Data) {
+  const paymentMethod = eventData.object as Stripe.PaymentMethod;
+  const previousCustomer = eventData.previous_attributes?.[
+    "customer"
+  ] as string;
+  // Get customer's UID from Firestore
+  const customersSnap = await firestore()
+    .collection(MainVariables.customersCollectionPath)
+    .where("customerId", "==", previousCustomer)
+    .get();
+  if (customersSnap.size !== 1) {
+    throw new Error("User not found!");
   }
+  await customersSnap.docs[0].ref.update({
+    paymentMethods: firestore.FieldValue.arrayRemove(paymentMethod.id),
+  });
 }
 
 /**
@@ -191,21 +194,9 @@ export const manageSubscriptionStatusChange = async (
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
     expand: ["default_payment_method", "items.data.price.product"],
   });
-  const batch = firestore().batch();
-  const uid = organizationId;
+  const bulkWriter = firestore().bulkWriter();
   const { price, quantity } = subscription.items.data[0];
   const product = price.product as Stripe.Product;
-  const prices = [];
-
-  for (const item of subscription.items.data) {
-    prices.push(
-      firestore()
-        .collection(MainVariables.productsCollectionPath)
-        .doc((item.price.product as Stripe.Product).id)
-        .collection("prices")
-        .doc(item.price.id)
-    );
-  }
 
   // Update with new Subscription status & details
   const subscriptionDetails: Subscription = {
@@ -221,7 +212,6 @@ export const manageSubscriptionStatusChange = async (
       .doc(product.id)
       .collection("prices")
       .doc(price.id),
-    prices,
     quantity: quantity ?? 0,
     items: subscription.items.data,
     cancel_at_period_end: subscription.cancel_at_period_end,
@@ -237,14 +227,14 @@ export const manageSubscriptionStatusChange = async (
     trial_end: stripeTimeToTimestamp(subscription.trial_end),
     pending_update: subscription.pending_update !== null,
     latest_invoice: subscription.latest_invoice as string,
-    metadata: { owner: uid, customer: customerId },
+    metadata: { owner: organizationId, customer: customerId },
     default_payment_method: subscription.default_payment_method,
   };
 
-  batch.set(
+  bulkWriter.set(
     firestore()
       .collection("Users")
-      .doc(uid)
+      .doc(organizationId)
       .collection("subscription")
       .doc("subscriptionDetails"),
     subscriptionDetails,
@@ -253,40 +243,102 @@ export const manageSubscriptionStatusChange = async (
 
   if (createAction) {
     try {
-      await batch.commit();
+      await bulkWriter.close();
     } catch (error) {
-      throw new Error("Error updating subscription");
+      handleError(error);
     }
     return;
   }
 
-  batch.update(firestore().collection("Organizations").doc(organizationId), {
-    subscriptionStatus: subscription.status,
-    cancellationDate: subscription.status === "canceled" ? new Date() : null,
-  });
-
-  const locations = await firestore()
-    .collection("Locations")
-    .where("organizationId", "==", organizationId)
-    .get();
-
-  let members: string[] = [];
-
-  for (const location of locations.docs) {
-    batch.update(location.ref, {
+  bulkWriter.update(
+    firestore().collection("Organizations").doc(organizationId),
+    {
       subscriptionStatus: subscription.status,
-    });
-    const employees = location.get("members") ?? [];
-    members = uniq([...members, ...employees]);
-  }
+    }
+  );
 
   try {
+    const needToClean = !["trialing", "active"].includes(subscription.status);
+
+    const members = await getMembersAndUpdateStatus(
+      bulkWriter,
+      subscription.status,
+      needToClean,
+      organizationId
+    );
+
+    const membersToClean = uniq([...members, organizationId]);
+
+    await bulkWriter.close();
+
     // If subscription status !== "trialing", "active"
-    if (!["trialing", "active"].includes(subscription.status)) {
-      await clearUserClaims(members, organizationId);
+    if (needToClean && membersToClean.length > 0) {
+      await clearUserClaims(membersToClean, organizationId);
     }
-    await batch.commit();
   } catch (error) {
-    throw new Error("Error updating subscription");
+    handleError(error);
   }
 };
+
+const getMembersAndUpdateStatus = (
+  bulkWriter: firestore.BulkWriter,
+  subscriptionStatus: LocationSubscriptionStatus,
+  needToClean: boolean,
+  organizationId: string
+) =>
+  new Promise<string[]>((resolve) => {
+    const locationsRef = firestore()
+      .collection("Locations")
+      .where("organizationId", "==", organizationId)
+      .withConverter(locationConverter);
+
+    let membersList: string[] = [];
+
+    locationsRef
+      .stream()
+      .on("data", (documentSnapshot: QueryDocumentSnapshot<ILocation>) => {
+        bulkWriter.update(documentSnapshot.ref, {
+          subscriptionStatus,
+        });
+        if (needToClean) {
+          const { members, supervisors } = documentSnapshot.data();
+
+          if (members) {
+            membersList = [...membersList, ...members];
+          }
+
+          if (supervisors) {
+            membersList = [...membersList, ...supervisors];
+          }
+        }
+      })
+      .on("end", () => {
+        const uniqMembers = uniq(membersList);
+        resolve(uniqMembers);
+      });
+  });
+
+export async function deleteOrganization(organizationId: string) {
+  const bulkWriter = firestore().bulkWriter();
+
+  // Delete subscription details
+  bulkWriter.delete(
+    firestore()
+      .collection("Users")
+      .doc(organizationId)
+      .collection("subscription")
+      .doc("subscriptionDetails")
+  );
+
+  // Update user document
+  bulkWriter.update(firestore().collection("Users").doc(organizationId), {
+    subscriptionId: firestore.FieldValue.delete(),
+  });
+
+  // Delete the organization document
+  bulkWriter.delete(
+    firestore().collection("Organizations").doc(organizationId)
+  );
+
+  await bulkWriter.close();
+}
