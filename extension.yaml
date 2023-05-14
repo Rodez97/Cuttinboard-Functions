@@ -14,6 +14,8 @@ contributors:
 externalServices:
   - name: Stripe
 
+license: Apache-2.0  # Required license
+
 roles:
   - role: firebaseauth.admin
     reason: >-
