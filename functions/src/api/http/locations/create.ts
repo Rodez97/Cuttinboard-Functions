@@ -1,5 +1,4 @@
 import { firestore } from "firebase-admin";
-import { https, logger } from "firebase-functions";
 import short from "short-uuid";
 import Stripe from "stripe";
 import { MainVariables } from "../../../config";
@@ -13,6 +12,8 @@ import {
 } from "@cuttinboard-solutions/types-helpers";
 import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
 import * as yup from "yup";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v1";
 
 interface ICreateLocationData {
   location: {
@@ -27,13 +28,13 @@ interface ICreateLocationData {
   };
 }
 
-export default https.onCall(async (data: ICreateLocationData, context) => {
-  const { auth } = context;
+export default onCall<ICreateLocationData>(async (request) => {
+  const { auth, data } = request;
 
   // Checking that the user is authenticated.
   if (!auth) {
     // Throwing an HttpsError so that the client gets the error details.
-    throw new https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "The function must be called while authenticated!"
     );
@@ -46,7 +47,7 @@ export default https.onCall(async (data: ICreateLocationData, context) => {
 
   if (!location || !location.name) {
     // If the required data is not provided then return an error.
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "The function must be called with valid data!"
     );
@@ -63,17 +64,14 @@ export default https.onCall(async (data: ICreateLocationData, context) => {
 
   if (!userDocument) {
     // If the user does not exist then return an error.
-    throw new https.HttpsError(
-      "not-found",
-      "The user document does not exist!"
-    );
+    throw new HttpsError("not-found", "The user document does not exist!");
   }
 
   const { customerId, subscriptionId } = userDocument;
 
   if (!customerId || !subscriptionId) {
     // If the user does not have a customer id or subscription id then return an error.
-    throw new https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "The user does not have a subscription!"
     );
@@ -178,6 +176,6 @@ export default https.onCall(async (data: ICreateLocationData, context) => {
     return { customerId, subscriptionId, organizationId: uid };
   } catch (error: any) {
     logger.error(error);
-    throw new https.HttpsError("unknown", error.message);
+    throw new HttpsError("unknown", error.message);
   }
 });

@@ -1,6 +1,7 @@
 import { Organization } from "@cuttinboard-solutions/types-helpers";
 import {
   FirestoreDataConverter,
+  PartialWithFieldValue,
   QueryDocumentSnapshot,
 } from "firebase-admin/firestore";
 
@@ -8,7 +9,8 @@ import {
  * Organization Firestore Data Converter
  */
 export const organizationConverter: FirestoreDataConverter<Organization> = {
-  toFirestore: (organization: Organization) => organization,
+  toFirestore: (organization: PartialWithFieldValue<Organization>) =>
+    organization,
   fromFirestore: (snapshot: QueryDocumentSnapshot<Organization>) =>
     snapshot.data(),
 };

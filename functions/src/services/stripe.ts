@@ -333,7 +333,6 @@ export async function deleteOrganization(organizationId: string) {
   // Update user document
   bulkWriter.update(firestore().collection("Users").doc(organizationId), {
     subscriptionId: firestore.FieldValue.delete(),
-    organizations: firestore.FieldValue.arrayRemove(organizationId),
   });
 
   // Delete the organization document

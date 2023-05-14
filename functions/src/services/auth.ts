@@ -7,6 +7,7 @@ import { auth, database } from "firebase-admin";
 import { isEqual } from "lodash";
 import { MainVariables } from "../config";
 import { updateUserMetadata } from "./updateUserMetadata";
+import { logger } from "firebase-functions";
 
 /**
  * Check if a user exists in Auth by his email.
@@ -61,7 +62,7 @@ export const updateUserClaims = async (
   });
 
   // Update the user's claims in the database
-  await updateUserMetadata(userId);
+  await updateUserMetadata({ uid: userId });
 
   return true;
 };
@@ -114,8 +115,8 @@ export const clearUserClaims = async (
       // Update real-time database to notify client to force refresh.
       // Set the refresh time to the current UTC timestamp.
       // This will be captured on the client to force a token refresh.
-      updates[`users/${user.uid}/metadata`] = {
-        refreshTime: new Date().getTime(),
+      updates[`users/${user.uid}/notifications`] = {
+        claims: new Date().getTime(),
       };
     }
   }
@@ -153,3 +154,48 @@ export async function checkPassword(email: string, password: string) {
   // If the request succeeded, return true
   return true;
 }
+
+export const clearUserClaimsLocation = async (
+  usersId: string[],
+  locationId: string
+) => {
+  try {
+    // Get the auth users by their uids
+    const { users } = await auth().getUsers(
+      usersId.map((userId) => ({ uid: userId }))
+    );
+    // Initialize the updates object
+    const updates: { [key: string]: any } = {};
+
+    const updateUserClaims = async (user: auth.UserRecord) => {
+      const { customClaims } = user;
+
+      if (!customClaims) {
+        return;
+      }
+
+      const organizationKey: IOrganizationKey = customClaims.organizationKey;
+
+      if (!organizationKey || organizationKey.locId !== locationId) {
+        return;
+      }
+
+      await auth().setCustomUserClaims(user.uid, null);
+
+      updates[`users/${user.uid}/notifications`] = {
+        claims: new Date().getTime(),
+      };
+    };
+
+    await Promise.all(users.map(updateUserClaims));
+
+    if (Object.keys(updates).length === 0) {
+      return;
+    }
+
+    // Update the database
+    await database().ref().update(updates);
+  } catch (error: any) {
+    logger.error(error);
+  }
+};

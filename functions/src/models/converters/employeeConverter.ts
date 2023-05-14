@@ -1,8 +1,37 @@
 import {
   IEmployee,
+  IEmployeesDocument,
   IOrganizationEmployee,
 } from "@cuttinboard-solutions/types-helpers";
-import { DocumentData, QueryDocumentSnapshot } from "firebase-admin/firestore";
+import {
+  DocumentData,
+  FirestoreDataConverter,
+  QueryDocumentSnapshot,
+} from "firebase-admin/firestore";
+
+export const employeeDocConverter: FirestoreDataConverter<IEmployeesDocument> =
+  {
+    toFirestore(object: IEmployeesDocument): DocumentData {
+      return object;
+    },
+    fromFirestore(
+      value: QueryDocumentSnapshot<IEmployeesDocument>
+    ): IEmployeesDocument {
+      const rawData = value.data();
+      return rawData;
+    },
+  };
+
+export const employeeDocArrayConverter: FirestoreDataConverter<IEmployee[]> = {
+  toFirestore(object: any): DocumentData {
+    return object;
+  },
+  fromFirestore(value: QueryDocumentSnapshot<IEmployeesDocument>): IEmployee[] {
+    const rawData = value.data();
+
+    return rawData.employees ? Object.values(rawData.employees) : [];
+  },
+};
 
 export const employeeConverter = {
   toFirestore(object: IEmployee): DocumentData {

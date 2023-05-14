@@ -7,6 +7,7 @@ import { handleError } from "./handleError";
 import { IEmployee } from "@cuttinboard-solutions/types-helpers";
 import { cuttinboardUserConverter } from "../models/converters/cuttinboardUserConverter";
 import { locationConverter } from "../models/converters/locationConverter";
+import { employeeDocConverter } from "../models/converters/employeeConverter";
 
 type InviteEmpArgs = {
   organizationId: string;
@@ -28,6 +29,7 @@ async function createNewUserAndEmployee({
   mainPosition,
   organizationId,
   locationName,
+  permissions,
 }: NewEmpUserArgs): Promise<string> {
   // generate random password for new user
   const randomPassword = Math.random().toString(36).slice(-8);
@@ -37,18 +39,29 @@ async function createNewUserAndEmployee({
     displayName: `${name} ${lastName}`,
     email,
     password: randomPassword,
+    emailVerified: true,
   });
 
   // initialize batch write to add new employee and update location
   const batch = firestore().batch();
 
   // add new user data
-  batch.set(firestore().collection("Users").doc(user.uid), {
-    name,
-    lastName,
-    email,
-    organizations: [organizationId],
-  });
+  batch.set(
+    firestore()
+      .collection("Users")
+      .doc(user.uid)
+      .withConverter(cuttinboardUserConverter),
+    {
+      name,
+      lastName,
+      email,
+      organizations: [organizationId],
+      organizationsRelationship: {
+        [organizationId]: firestore.FieldValue.arrayUnion(locationId),
+      },
+    },
+    { merge: true }
+  );
 
   // data to add for new employee
   const newEmployeeData: IEmployee = {
@@ -63,11 +76,16 @@ async function createNewUserAndEmployee({
     mainPosition,
     wagePerPosition,
     createdAt: firestore.Timestamp.now().toMillis(),
-    refPath: `Locations/${locationId}/employees/${user.uid}`,
+    refPath: `Locations/${locationId}/employees/employeesDocument`,
+    permissions,
   };
 
   // add new employee to organization
-  batch.set(firestore().doc(newEmployeeData.refPath), newEmployeeData);
+  batch.set(
+    firestore().doc(`Locations/${locationId}/employees/employeesDocument`),
+    { employees: { [newEmployeeData.id]: newEmployeeData } },
+    { merge: true }
+  );
 
   // add new employee as member of location
   batch.update(firestore().collection("Locations").doc(locationId), {
@@ -93,16 +111,16 @@ async function createNewEmployee(
   locationName: string,
   empData: InviteEmpArgs
 ) {
-  // Get the data for the user with the provided employee ID
-  const userSnap = await firestore()
+  const userDocumentRef = firestore()
     .collection("Users")
     .doc(employeeId)
-    .withConverter(cuttinboardUserConverter)
-    .get();
+    .withConverter(cuttinboardUserConverter);
+  // Get the data for the user with the provided employee ID
+  const userSnap = await userDocumentRef.get();
   const userData = userSnap.data();
 
+  // If the user data is not found, throw an error
   if (!userData) {
-    // If the user data is not found, throw an error
     throw new https.HttpsError(
       "failed-precondition",
       "User's root document not found"
@@ -130,20 +148,30 @@ async function createNewEmployee(
     organizationId,
     startDate: firestore.Timestamp.now().toMillis(),
     createdAt: firestore.Timestamp.now().toMillis(),
-    refPath: `Locations/${locationId}/employees/${employeeId}`,
+    refPath: `Locations/${locationId}/employees/employeesDocument`,
   };
 
   // Add the new employee document to the organization's employee collection
-  batch.set(firestore().doc(newEmployeeToAdd.refPath), newEmployeeToAdd);
+  batch.set(
+    firestore()
+      .doc(newEmployeeToAdd.refPath)
+      .withConverter(employeeDocConverter),
+    { employees: { [newEmployeeToAdd.id]: newEmployeeToAdd } },
+    { merge: true }
+  );
+
+  // add organization and location to user
+  batch.update(userDocumentRef, {
+    organizations: firestore.FieldValue.arrayUnion(organizationId),
+    locations: firestore.FieldValue.arrayUnion(locationId),
+    organizationsRelationship: {
+      [organizationId]: firestore.FieldValue.arrayUnion(locationId),
+    },
+  });
 
   // Add the employee ID to the members array in the location document
   batch.update(firestore().collection("Locations").doc(locationId), {
     members: firestore.FieldValue.arrayUnion(employeeId),
-  });
-
-  // Add the organization ID to the organizations array in the user document
-  batch.update(firestore().collection("Users").doc(employeeId), {
-    organizations: firestore.FieldValue.arrayUnion(organizationId),
   });
 
   // Commit the batch to apply all the changes at once
@@ -175,6 +203,7 @@ export const inviteEmployee = async (
     wagePerPosition,
     mainPosition,
     organizationId,
+    permissions,
   } = data;
   try {
     // Check if the location exists
@@ -213,6 +242,7 @@ export const inviteEmployee = async (
         mainPosition,
         wagePerPosition,
         locationName,
+        permissions,
       });
       return { status: "CREATED", employeeId };
     } else {
@@ -221,10 +251,13 @@ export const inviteEmployee = async (
         .collection("Locations")
         .doc(locationId)
         .collection("employees")
-        .doc(userExists.uid)
+        .doc("employeesDocument")
         .get();
 
-      if (employeeSnap.exists) {
+      if (
+        employeeSnap.exists &&
+        employeeSnap.data()?.employees?.[userExists.uid]
+      ) {
         // If the employee document exists then the user is already a member of the location. Throw an error.
         throw new https.HttpsError(
           "failed-precondition",

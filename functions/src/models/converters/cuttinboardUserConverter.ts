@@ -1,8 +1,12 @@
 import { ICuttinboardUser } from "@cuttinboard-solutions/types-helpers";
-import { DocumentData, QueryDocumentSnapshot } from "firebase-admin/firestore";
+import {
+  DocumentData,
+  PartialWithFieldValue,
+  QueryDocumentSnapshot,
+} from "firebase-admin/firestore";
 
 export const cuttinboardUserConverter = {
-  toFirestore(object: ICuttinboardUser): DocumentData {
+  toFirestore(object: PartialWithFieldValue<ICuttinboardUser>): DocumentData {
     const { refPath, id, ...objectToSave } = object;
     return objectToSave;
   },

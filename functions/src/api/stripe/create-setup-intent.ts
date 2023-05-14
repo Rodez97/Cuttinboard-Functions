@@ -1,19 +1,21 @@
 import { firestore } from "firebase-admin";
-import { https } from "firebase-functions";
 import Stripe from "stripe";
 import { MainVariables } from "../../config";
 import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-export default https.onCall(async (_, context) => {
-  if (!context.auth) {
+export default onCall(async (request) => {
+  const { auth } = request;
+
+  if (!auth) {
     // If the user is not authenticated
-    throw new https.HttpsError(
+    throw new HttpsError(
       "unauthenticated",
       "The function must be called while authenticated."
     );
   }
 
-  const { uid } = context.auth;
+  const { uid } = auth;
 
   // Get the user document
   const userDocument = await firestore()
@@ -26,17 +28,14 @@ export default https.onCall(async (_, context) => {
 
   if (!userDocument.exists || !userDocumentData) {
     // If the user document does not exist then throw an error
-    throw new https.HttpsError(
-      "not-found",
-      "The user document does not exist!"
-    );
+    throw new HttpsError("not-found", "The user document does not exist!");
   }
 
   const { customerId } = userDocumentData;
 
   if (!customerId) {
     // If the user does not have a customer ID then throw an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "The user does not have a customer ID!"
     );
@@ -63,7 +62,7 @@ export default https.onCall(async (_, context) => {
     // Return the session url
     return setupIntent.client_secret;
   } catch (error) {
-    throw new https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "The user can't create the setup intent",
       error

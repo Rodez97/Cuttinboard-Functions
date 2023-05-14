@@ -1,12 +1,11 @@
 import {
-  IEmployee,
   IOrganizationEmployee,
   RoleAccessLevels,
 } from "@cuttinboard-solutions/types-helpers";
 import { auth, firestore } from "firebase-admin";
 import { https, logger } from "firebase-functions";
 import { cuttinboardUserConverter } from "../models/converters/cuttinboardUserConverter";
-import { employeeConverter } from "../models/converters/employeeConverter";
+import { locationConverter } from "../models/converters/locationConverter";
 import { checkIfUserExistsByEmail } from "./auth";
 import { sendWelcomeEmail } from "./emails";
 
@@ -23,14 +22,15 @@ async function createNewSupervisor(
   employeeId: string,
   organizationId: string,
   supervisingLocations: string[],
-  addedBy: string
+  addedBy: string,
+  batch: firestore.WriteBatch
 ) {
-  // get user data
-  const userSnap = await firestore()
+  const userDocumentRef = firestore()
     .collection("Users")
     .doc(employeeId)
-    .withConverter(cuttinboardUserConverter)
-    .get();
+    .withConverter(cuttinboardUserConverter);
+  // get user data
+  const userSnap = await userDocumentRef.get();
   const userData = userSnap.data();
 
   // throw error if user data not found
@@ -40,9 +40,6 @@ async function createNewSupervisor(
       "User's root document not found"
     );
   }
-
-  // initialize batch write
-  const batch = firestore().batch();
 
   const { name, lastName, phoneNumber, avatar, email } = userData;
 
@@ -71,6 +68,11 @@ async function createNewSupervisor(
     newEmployeeToAdd
   );
 
+  // add organization to user
+  batch.update(userDocumentRef, {
+    organizations: firestore.FieldValue.arrayUnion(organizationId),
+  });
+
   // add employee as supervisor for each location
   for (const loc of supervisingLocations) {
     batch.update(firestore().collection("Locations").doc(loc), {
@@ -78,61 +80,8 @@ async function createNewSupervisor(
     });
   }
 
-  // update user document to add organization to list of organizations
-  batch.update(firestore().collection("Users").doc(employeeId), {
-    organizations: firestore.FieldValue.arrayUnion(organizationId),
-  });
-
   // execute batch write
   await batch.commit();
-
-  // send email to employee
-  await sendWelcomeEmail(email, name, 11, {
-    NAME: name,
-    ADDED_BY: addedBy,
-  });
-}
-
-async function updateEmployeeToSupervisor(
-  existentEmployee: IEmployee,
-  supervisingLocations: string[],
-  addedBy: string
-) {
-  // initialize batch write to update employee and locations
-  const batch = firestore().batch();
-
-  // Create the new org employee
-  const newEmployeeToAdd: IOrganizationEmployee = {
-    id: existentEmployee.id,
-    name: existentEmployee.name,
-    lastName: existentEmployee.lastName,
-    phoneNumber: existentEmployee.phoneNumber,
-    email: existentEmployee.email,
-    avatar: existentEmployee.avatar,
-    organizationId: existentEmployee.organizationId,
-    createdAt: firestore.Timestamp.now().toMillis(),
-    refPath: `Organizations/${existentEmployee.organizationId}/employees/${existentEmployee.id}`,
-    supervisingLocations,
-    role: RoleAccessLevels.ADMIN,
-  };
-
-  // Add the new employee document to the organization's employee collection
-  batch.set(firestore().doc(newEmployeeToAdd.refPath), newEmployeeToAdd);
-
-  // Remove the old employee document from the location's employee collection
-  batch.delete(firestore().doc(existentEmployee.refPath));
-
-  // add employee as supervisor for each location
-  for (const loc of supervisingLocations) {
-    batch.update(firestore().collection("Locations").doc(loc), {
-      supervisors: firestore.FieldValue.arrayUnion(existentEmployee.id),
-    });
-  }
-
-  // execute batch write
-  await batch.commit();
-
-  const { name, email } = existentEmployee;
 
   // send email to employee
   await sendWelcomeEmail(email, name, 11, {
@@ -157,18 +106,26 @@ async function createNewUserAndSupervisor({
     displayName: `${name} ${lastName}`,
     email,
     password: randomPassword,
+    emailVerified: true,
   });
 
   // initialize batch write to add new employee and update locations
   const batch = firestore().batch();
 
   // add new user data
-  batch.set(firestore().collection("Users").doc(user.uid), {
-    name,
-    lastName,
-    email,
-    organizations: [organizationId],
-  });
+  batch.set(
+    firestore()
+      .collection("Users")
+      .doc(user.uid)
+      .withConverter(cuttinboardUserConverter),
+    {
+      name,
+      lastName,
+      email,
+      organizations: [organizationId],
+    },
+    { merge: true }
+  );
 
   // data to add for new employee
   const newEmployeeData: IOrganizationEmployee = {
@@ -221,13 +178,10 @@ export const inviteSupervisor = async ({
   email,
   organizationId,
   addedBy,
-}: NewAdminUserArgs): Promise<
-  | {
-      status: "ADDED" | "CREATED" | "ALREADY_MEMBER";
-      employeeId: string;
-    }
-  | undefined
-> => {
+}: NewAdminUserArgs): Promise<{
+  status: "ADDED" | "CREATED";
+  employeeId: string;
+}> => {
   try {
     // check if user exists
     const userExists = await checkIfUserExistsByEmail(email);
@@ -246,39 +200,47 @@ export const inviteSupervisor = async ({
     } else {
       // Check if the employee exists in the organization as member of any location
       const employeeSnap = await firestore()
-        .collectionGroup("employees")
+        .collection("Locations")
         .where("organizationId", "==", organizationId)
-        .where("id", "==", userExists.uid)
-        .withConverter(employeeConverter)
+        .where("members", "array-contains", userExists.uid)
+        .withConverter(locationConverter)
         .get();
-      const employeeExists = employeeSnap.size > 0;
 
-      if (employeeExists) {
-        // If the employee exists, update the employee to be an admin
-        const existentEmployee = employeeSnap.docs[0].data();
-        const role = existentEmployee.role;
+      // Initialize batch write
+      const batch = firestore().batch();
 
-        if (role <= RoleAccessLevels.ADMIN) {
-          throw new https.HttpsError(
-            "failed-precondition",
-            "Employee is already a supervisor"
+      if (employeeSnap.size > 0) {
+        // If the employee exists as a member of any location, remove them from the location employee collection and member array
+        employeeSnap.forEach((locationDoc) => {
+          batch.update(locationDoc.ref, {
+            members: firestore.FieldValue.arrayRemove(userExists.uid),
+          });
+          batch.set(
+            locationDoc.ref.collection("employees").doc("employeesDocument"),
+            {
+              employees: {
+                [userExists.uid]: firestore.FieldValue.delete(),
+              },
+            },
+            { merge: true }
           );
-        }
-
-        await updateEmployeeToSupervisor(
-          existentEmployee,
-          supervisingLocations,
-          addedBy
-        );
-        return { status: "ALREADY_MEMBER", employeeId: userExists.uid };
+          batch.set(
+            firestore().collection("Users").doc(userExists.uid),
+            {
+              locations: firestore.FieldValue.arrayRemove(locationDoc.id),
+            },
+            { merge: true }
+          );
+        });
       }
 
-      // If the employee doesn't exist, create the employee and invite them
+      // Create the new supervisor
       await createNewSupervisor(
         userExists.uid,
         organizationId,
         supervisingLocations,
-        addedBy
+        addedBy,
+        batch
       );
       return { status: "ADDED", employeeId: userExists.uid };
     }

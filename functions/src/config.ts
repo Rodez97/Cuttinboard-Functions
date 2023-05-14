@@ -1,14 +1,9 @@
 import { ServiceAccount } from "firebase-admin";
 
-const test = false; //
-
 export const MainVariables = {
-  stripeSecretKey: test
-    ? "rk_test_51KZnSWCYVoOESVglcSUOV89oUz3WqZIspCh4V1xDjEj2WYcdeFwrsOXwTGXcMuDcBGKyUpmCIUqSjP3ajkYRKs5D00swwKlqpZ"
-    : "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",
-  stripeWebhookSecret: test
-    ? "whsec_WoKNSkXt1zhvbp8McX4YIp9rnrPD5KYm"
-    : "whsec_EgdRTgh9RH9CvgLsgwhxdiwyvXOkiFe5",
+  stripeSecretKey:
+    "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",
+  stripeWebhookSecret: "whsec_B7g0lo60kMko72ndWK65MjlcCBdVmfxL",
   productsCollectionPath: "Products",
   customersCollectionPath: "Users",
   messagingSenderId: "286988124291",
@@ -21,6 +16,11 @@ export const MainVariables = {
   oneSignalAppKey: "N2M1ODdmMzEtNmM5ZS00ODk5LTg2NmMtYzg0MWYyZTIzODZl",
   oseSignalUserAuthKey: "Yzc0NzAwMTQtOWIzMC00YmEzLWExODgtM2M0YWY1MmEyYjk0",
   oneSignalAppId: "867241bc-8690-41a5-a051-000db9b7c136",
+  stripeProductId: "prod_MINsulkDhsnMys",
+  stripePriceId: "price_1N1WbZCYVoOESVgl3qVWFKiQ",
+  scheduleChannelId: "fc5fd854-cd9f-4fe3-9d2d-cf873803f2f4",
+  messageBoardsChannelId: "b5ea2d2d-e156-40c7-9e72-bb9a4a6455c1",
+  directMessagesChannelId: "731773a1-2ae2-4e56-8fd3-494bb1056d66",
 };
 
 export const CREDENTIALS = {
@@ -39,7 +39,7 @@ export const CREDENTIALS = {
     "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-gzxd1%40cuttinboard-2021.iam.gserviceaccount.com",
 } as ServiceAccount;
 
-export const BOARDS = ["notes", "storage"];
+export const BOARDS = ["notes", "files"];
 
 export const STORAGE_LIMIT = 5e9;
 

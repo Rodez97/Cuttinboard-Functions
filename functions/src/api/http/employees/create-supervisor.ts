@@ -1,6 +1,6 @@
 import { firestore } from "firebase-admin";
-import { https } from "firebase-functions";
 import { inviteSupervisor } from "../../../services/inviteSupervisor";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 export interface EmployeeData {
   name: string;
@@ -12,12 +12,12 @@ export interface EmployeeData {
 /**
  * Add a new employee to the organization or location
  */
-export default https.onCall(async (data: EmployeeData, context) => {
-  const { auth } = context;
+export default onCall<EmployeeData>(async (request) => {
+  const { auth, data } = request;
 
   if (!auth) {
     // If the user is not authenticated then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "unauthenticated",
       "The function must be called while authenticated."
     );
@@ -28,7 +28,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (!name || !lastName || !email) {
     // If the required data is not provided then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "The function must be called with valid data."
     );
@@ -36,7 +36,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (email === auth.token.email) {
     // If the user is trying to add himself then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "You can not add yourself as an employee."
     );
@@ -45,7 +45,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
   // Lower case the email
   const loweredEmail = email.toLowerCase();
 
-  // Get the organization data
+  // Get the organization data (Only the owner can add employees as supervisors)
   const userOrg = await firestore()
     .collection("Organizations")
     .doc(auth.uid)
@@ -54,7 +54,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (!organizationData) {
     // If the organization does not exist then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "The organization does not exist."
     );
@@ -62,7 +62,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (organizationData.subscriptionStatus === "canceled") {
     // If the subscription is canceled then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "The organization's subscription is canceled."
     );
@@ -81,13 +81,6 @@ export default https.onCall(async (data: EmployeeData, context) => {
     supervisingLocations: supervisingLocations ?? [],
     addedBy,
   });
-  if (result) {
-    return result;
-  } else {
-    // If the supervisor is already registered then return an error
-    throw new https.HttpsError(
-      "already-exists",
-      "There was an error inviting the supervisor."
-    );
-  }
+
+  return result;
 });

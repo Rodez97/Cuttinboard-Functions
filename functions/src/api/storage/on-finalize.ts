@@ -1,6 +1,7 @@
 import { firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
-import { handleError } from "../../services/handleError";
+import { locationConverter } from "../../models/converters/locationConverter";
+import { organizationConverter } from "../../models/converters/organizationConverter";
 
 export default functions.storage.object().onFinalize(async (object) => {
   const filePath = object.name;
@@ -10,10 +11,10 @@ export default functions.storage.object().onFinalize(async (object) => {
 
   // Regex to get the information from the file path (organizationId, locationId, drawerId, fileName)
   const regexLocationStoragePath =
-    /^organizations\/([\w\-_]+)\/locations\/([\w\-_]+)\/storage\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
+    /^locations\/([\w\-_]+)\/files\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
 
   const regexGlobalStoragePath =
-    /^organizations\/([\w\-_]+)\/storage\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
+    /^organizations\/([\w\-_]+)\/files\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
 
   if (filePath && regexGlobalStoragePath.test(filePath)) {
     const matches = filePath.match(regexGlobalStoragePath);
@@ -39,7 +40,7 @@ export default functions.storage.object().onFinalize(async (object) => {
       return;
     }
 
-    const [, locationId, drawerId, fileName] = matches.slice(1); // Organization ID, Drawer ID, File name
+    const [locationId, drawerId, fileName] = matches.slice(1); // Organization ID, Drawer ID, File name
     await updateLocationUsage(
       locationId,
       fileSize,
@@ -57,7 +58,9 @@ async function updateGlobalUsage(
   filename: string,
   filePath: string
 ) {
-  const organizationRef = firestore().doc(`Organizations/${organizationId}`);
+  const organizationRef = firestore()
+    .doc(`Organizations/${organizationId}`)
+    .withConverter(organizationConverter);
   const fileId = filename.split(".")[0];
   let deleteFile = false;
 
@@ -69,7 +72,7 @@ async function updateGlobalUsage(
       const organization = await transaction.get(organizationRef);
       const organizationData = organization.data(); // (!) The location document exists
 
-      if (!organization.exists || !organizationData) {
+      if (!organizationData) {
         // ! If the location document does not exist throw an error
         throw "Location document does not exist";
       }
@@ -77,13 +80,10 @@ async function updateGlobalUsage(
       // Get the storage limit of the location and the storage used
       const { storageUsed, limits } = organizationData;
 
-      // Get the storage used in the location
-      const locationStorageUsage = Number(storageUsed);
-
       // Get the storage limit of the location
       const locationStorageLimit = Number(limits.storage);
 
-      if (locationStorageUsage + fileSize > locationStorageLimit) {
+      if (storageUsed + fileSize > locationStorageLimit) {
         // ! If the storage limit is exceeded then delete the file and the document
         deleteFile = true;
 
@@ -109,8 +109,8 @@ async function updateGlobalUsage(
       // Delete the file
       await storage().bucket().file(filePath).delete();
     }
-  } catch (error) {
-    handleError(error);
+  } catch (error: any) {
+    functions.logger.error(error);
   }
 }
 
@@ -121,7 +121,9 @@ async function updateLocationUsage(
   filename: string,
   filePath: string
 ) {
-  const locationRefRef = firestore().doc(`Locations/${locationId}`);
+  const locationRefRef = firestore()
+    .doc(`Locations/${locationId}`)
+    .withConverter(locationConverter);
   const fileId = filename.split(".")[0];
   let deleteFile = false;
 
@@ -133,7 +135,7 @@ async function updateLocationUsage(
       const location = await transaction.get(locationRefRef);
       const locationData = location.data(); // (!) The location document exists
 
-      if (!location.exists || !locationData) {
+      if (!locationData) {
         // ! If the location document does not exist throw an error
         throw "Location document does not exist";
       }
@@ -141,13 +143,10 @@ async function updateLocationUsage(
       // Get the storage limit of the location and the storage used
       const { storageUsed, limits } = locationData;
 
-      // Get the storage used in the location
-      const locationStorageUsage = Number(storageUsed);
-
       // Get the storage limit of the location
       const locationStorageLimit = Number(limits.storage);
 
-      if (locationStorageUsage + fileSize > locationStorageLimit) {
+      if (storageUsed + fileSize > locationStorageLimit) {
         // ! If the storage limit is exceeded then delete the file and the document
         deleteFile = true;
 
@@ -173,7 +172,7 @@ async function updateLocationUsage(
       // Delete the file
       await storage().bucket().file(filePath).delete();
     }
-  } catch (error) {
-    handleError(error);
+  } catch (error: any) {
+    functions.logger.error(error);
   }
 }

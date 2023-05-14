@@ -1,5 +1,4 @@
 import { firestore } from "firebase-admin";
-import { https } from "firebase-functions";
 import Stripe from "stripe";
 import { MainVariables } from "../../../config";
 import short from "short-uuid";
@@ -8,14 +7,20 @@ import { inviteEmployee } from "../../../services/inviteEmployee";
 import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
 import {
   DefaultScheduleSettings,
+  ICuttinboardUser,
   ILocation,
+  ILocationAddress,
   IOrganizationEmployee,
   RoleAccessLevels,
 } from "@cuttinboard-solutions/types-helpers";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { PartialWithFieldValue } from "firebase-admin/firestore";
+import { organizationConverter } from "../../../models/converters/organizationConverter";
 
 interface IUpgradeOwnerData {
-  price: string;
   locationName: string;
+  intId?: string;
+  address?: ILocationAddress;
   gm: {
     name: string;
     lastName: string;
@@ -23,30 +28,24 @@ interface IUpgradeOwnerData {
   } | null;
 }
 
-export default https.onCall(async (data: IUpgradeOwnerData, context) => {
-  if (!context.auth) {
+export default onCall<IUpgradeOwnerData>(async (request) => {
+  const { auth, data } = request;
+
+  if (!auth) {
     // If the user is not authenticated
-    throw new https.HttpsError(
+    throw new HttpsError(
       "unauthenticated",
       "The function must be called while authenticated."
     );
   }
 
-  const { price, locationName, gm } = data;
+  const { locationName, gm, intId, address } = data;
 
-  if (typeof price !== "string" || !price) {
-    // If the price is not valid then throw an error
-    throw new https.HttpsError(
-      "invalid-argument",
-      "The function must be called with a valid price!"
-    );
-  }
-
-  const { uid, email } = context.auth.token;
+  const { uid, email } = auth.token;
 
   if (!email) {
     // If the email or uid is not valid then throw an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "The function must be called with a valid email!"
     );
@@ -65,28 +64,26 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
 
   if (!stripe) {
     // If stripe is not initialized then throw an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "internal",
       "The stripe client could not be initialized!"
     );
   }
 
+  const userDocumentRef = firestore()
+    .collection("Users")
+    .doc(uid)
+    .withConverter(cuttinboardUserConverter);
+
   try {
     // Check if user is already a customer
-    const userDocumentSnap = await firestore()
-      .collection("Users")
-      .doc(uid)
-      .withConverter(cuttinboardUserConverter)
-      .get();
+    const userDocumentSnap = await userDocumentRef.get();
 
     const userData = userDocumentSnap.data();
 
     if (!userData) {
       // If the user document does not exist then throw an error
-      throw new https.HttpsError(
-        "not-found",
-        "The user document does not exist!"
-      );
+      throw new HttpsError("not-found", "The user document does not exist!");
     }
 
     const { customerId, subscriptionId, name, lastName, phoneNumber, avatar } =
@@ -94,7 +91,7 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
 
     if (subscriptionId) {
       // If the user already has a subscription then throw an error
-      throw new https.HttpsError(
+      throw new HttpsError(
         "already-exists",
         "The user already has a subscription!"
       );
@@ -102,10 +99,9 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
 
     const batch = firestore().batch();
 
-    const userUpdates: {
-      customerId?: string;
-      subscriptionId?: string;
-    } = {};
+    const userUpdates: PartialWithFieldValue<ICuttinboardUser> = {
+      organizations: firestore.FieldValue.arrayUnion(uid),
+    };
 
     if (!customerId) {
       // If the user does not have a customer ID then create one
@@ -120,10 +116,7 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
 
       if (!customer) {
         // If the customer is not created then throw an error
-        throw new https.HttpsError(
-          "internal",
-          "The customer could not be created!"
-        );
+        throw new HttpsError("internal", "The customer could not be created!");
       }
 
       // Set the customer ID
@@ -136,7 +129,7 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
     // Create the subscription
     const subscription = await stripe.subscriptions.create({
       customer: userUpdates.customerId,
-      items: [{ price }],
+      items: [{ price: MainVariables.stripePriceId, quantity: 0 }],
       metadata: {
         firebaseUID: uid,
       },
@@ -146,7 +139,7 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
 
     if (!subscription) {
       // If the subscription is not created then throw an error
-      throw new https.HttpsError(
+      throw new HttpsError(
         "internal",
         "The subscription could not be created!"
       );
@@ -181,6 +174,8 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
         positions: [],
         schedule: DefaultScheduleSettings,
       },
+      address,
+      intId,
     };
 
     // Set the location data
@@ -209,15 +204,23 @@ export default https.onCall(async (data: IUpgradeOwnerData, context) => {
     userUpdates.subscriptionId = subscription.id;
 
     // Create the organization document with initial data
-    batch.set(firestore().collection("Organizations").doc(uid), {
-      locations: 0,
-      subItemId: subscription.items.data[0].id,
-      subscriptionStatus: subscription.status,
-      limits: {
-        storage: "5e+9",
+    batch.set(
+      firestore()
+        .collection("Organizations")
+        .doc(uid)
+        .withConverter(organizationConverter),
+      {
+        customerId: userUpdates.customerId,
+        subscriptionId: userUpdates.subscriptionId,
+        locations: 0,
+        subItemId: subscription.items.data[0].id,
+        subscriptionStatus: subscription.status,
+        limits: {
+          storage: "5e+9",
+        },
       },
-      ...userUpdates,
-    });
+      { merge: true }
+    );
 
     // Create the owner - employee document with initial data
     const newEmployeeToAdd: IOrganizationEmployee = {

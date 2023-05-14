@@ -1,9 +1,10 @@
 import {
   IOrganizationKey,
+  ManagerPermissions,
   RoleAccessLevels,
 } from "@cuttinboard-solutions/types-helpers";
-import { https } from "firebase-functions";
 import { inviteEmployee } from "../../../services/inviteEmployee";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 export interface EmployeeData {
   name: string;
@@ -17,17 +18,18 @@ export interface EmployeeData {
   positions?: string[];
   wagePerPosition?: Record<string, number>;
   mainPosition?: string;
+  permissions?: ManagerPermissions;
 }
 
 /**
  * Add a new employee to the organization or location
  */
-export default https.onCall(async (data: EmployeeData, context) => {
-  const { auth } = context;
+export default onCall<EmployeeData>(async (request) => {
+  const { auth, data } = request;
 
   if (!auth) {
     // If the user is not authenticated then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "unauthenticated",
       "The function must be called while authenticated."
     );
@@ -38,7 +40,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (!name || !lastName || !email || !role || !locationId) {
     // If the required data is not provided then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "The function must be called with valid data. (name, lastName, email, role, locationId)"
     );
@@ -46,7 +48,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (email === auth.token.email) {
     // If the user is trying to add himself then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "You can not add yourself as an employee."
     );
@@ -58,7 +60,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (!organizationKey) {
     // If the access key is not provided then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "The function must be called with a valid access key for this location."
     );
@@ -69,7 +71,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (locId !== locationId) {
     // If the locationId provided does not match the locationId from the access key then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "The locationId provided does not match the locationId from the access key."
     );
@@ -77,7 +79,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
 
   if (myRole >= role) {
     // If the role of the user that is inviting the employee is greater than the role of the employee then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "permission-denied",
       "You can not invite an employee with a higher or equal role than you."
     );
@@ -94,7 +96,7 @@ export default https.onCall(async (data: EmployeeData, context) => {
     return result;
   } else {
     // If the employee is already registered then return an error
-    throw new https.HttpsError(
+    throw new HttpsError(
       "already-exists",
       "There was an error inviting the employee."
     );
