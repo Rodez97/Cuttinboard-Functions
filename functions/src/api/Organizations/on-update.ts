@@ -1,65 +1,57 @@
 import { Organization } from "@cuttinboard-solutions/types-helpers";
-import * as functions from "firebase-functions";
 import Stripe from "stripe";
 import { MainVariables } from "../../config";
-import { handleError } from "../../services/handleError";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { logger, auth } from "firebase-functions";
 
-export default functions.firestore
-  .document("Organizations/{organizationId}")
-  .onUpdate(async (change) => {
-    const beforeData = change.before.data() as Organization;
-    const afterData = change.after.data() as Organization;
+// Initialize Stripe
+const stripe = new Stripe(MainVariables.stripeSecretKey, {
+  apiVersion: "2020-08-27",
+  // Register extension as a Stripe plugin
+  // https://stripe.com/docs/building-plugins#setappinfo
+  appInfo: {
+    name: "Cuttinboard-Firebase",
+    version: "0.1",
+  },
+});
 
-    const beforeLocations = beforeData.locations ?? 0;
+export default onDocumentUpdated(
+  "Organizations/{organizationId}",
+  async (event) => {
+    const { data } = event;
+    const beforeData = data?.before.data() as Organization;
+    const afterData = data?.after.data() as Organization;
 
-    const afterLocations = afterData.locations ?? 0;
+    const beforeLocations = beforeData?.locations ?? 0;
+    const afterLocations = afterData?.locations ?? 0;
 
-    const hadMultipleLocations = Boolean(afterData.hadMultipleLocations);
+    const hadMultipleLocations = afterData?.hadMultipleLocations || false;
 
     if (beforeLocations === afterLocations) {
       return;
     }
 
     if (!hadMultipleLocations && afterLocations > 1) {
-      await change.after.ref.update({
+      await data?.after.ref.update({
         hadMultipleLocations: true,
       });
     }
 
-    await updateStripeRecord(
-      afterData.subscriptionId,
-      afterData.subItemId,
-      afterLocations
-    );
-  });
+    const { subscriptionId, subItemId } = afterData;
 
-async function updateStripeRecord(
-  subscriptionId: string,
-  subItemId: string,
-  quantity: number
-) {
-  try {
-    // Initialize Stripe
-    const stripe = new Stripe(MainVariables.stripeSecretKey, {
-      apiVersion: "2020-08-27",
-      // Register extension as a Stripe plugin
-      // https://stripe.com/docs/building-plugins#setappinfo
-      appInfo: {
-        name: "Cuttinboard-Firebase",
-        version: "0.1",
-      },
-    });
-
-    // Create the stripe usage record with the new quantity
-    await stripe.subscriptions.update(subscriptionId, {
-      items: [
-        {
-          id: subItemId,
-          quantity,
-        },
-      ],
-    });
-  } catch (error) {
-    handleError(error);
+    try {
+      // Create the stripe usage record with the new quantity
+      await stripe.subscriptions.update(subscriptionId, {
+        items: [
+          {
+            id: subItemId,
+            quantity: afterLocations,
+          },
+        ],
+      });
+    } catch (error: any) {
+      logger.error(error);
+      throw new auth.HttpsError("unknown", error.message);
+    }
   }
-}
+);

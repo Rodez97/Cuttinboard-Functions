@@ -221,7 +221,7 @@ export const inviteEmployee = async (
     const { name: locationName, members, limits } = locationData;
     const membersCount = members ? members.length : 0;
 
-    if (membersCount === limits.employees) {
+    if (membersCount >= limits.employees) {
       throw new https.HttpsError(
         "failed-precondition",
         "You have reached the maximum number of employees for this location"

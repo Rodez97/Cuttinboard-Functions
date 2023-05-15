@@ -1,3 +1,4 @@
+import { ILocationLimits } from "@cuttinboard-solutions/types-helpers";
 import { ServiceAccount } from "firebase-admin";
 
 export const MainVariables = {
@@ -42,6 +43,11 @@ export const CREDENTIALS = {
 export const BOARDS = ["notes", "files"];
 
 export const STORAGE_LIMIT = 5e9;
+
+export const LOCATION_LIMITS: ILocationLimits = {
+  employees: 100,
+  storage: "5e+9",
+};
 
 export default {
   stripeSecretKey: process.env.STRIPE_API_KEY,

@@ -133,15 +133,15 @@ const deleteAllShifts = async (locationId: string, weekId: string) => {
 
   const shiftsSnapshot = await shiftsRef.get();
 
-  if (!shiftsSnapshot.size || shiftsSnapshot.empty) {
+  if (shiftsSnapshot.empty) {
     return;
   }
 
-  const batch = firestore().batch();
+  const bulkWriter = firestore().bulkWriter();
 
   shiftsSnapshot.forEach((doc) => {
-    batch.delete(doc.ref);
+    bulkWriter.delete(doc.ref);
   });
 
-  await batch.commit();
+  await bulkWriter.close();
 };

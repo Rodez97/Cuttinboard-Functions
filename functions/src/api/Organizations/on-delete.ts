@@ -1,7 +1,7 @@
 import { firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { locationConverter } from "../../models/converters/locationConverter";
-import { deleteSubcollections } from "../../services/deleteSubcollections";
+import { GrpcStatus } from "firebase-admin/firestore";
 
 export default functions.firestore
   .document("Organizations/{organizationId}")
@@ -9,11 +9,29 @@ export default functions.firestore
     const { organizationId } = context.params;
 
     try {
+      // Create a bulk writer instance
+      const bulkWriter = firestore().bulkWriter();
+      // Set the error handler on the bulkWriter
+      bulkWriter.onWriteError((error) => {
+        if (error.code === GrpcStatus.NOT_FOUND) {
+          functions.logger.log(
+            "Document does not exist: ",
+            error.documentRef.path
+          );
+          return false;
+        }
+        if (error.failedAttempts < 10) {
+          return true;
+        } else {
+          return false;
+        }
+      });
+
       // Delete locations and get the members and supervisors
-      await deleteLocAndGetMembers(organizationId);
+      await deleteLocations(organizationId, bulkWriter);
 
       // Delete all the collections, subcollections and documents that belong to the organization.
-      await deleteSubcollections(_.ref);
+      await firestore().recursiveDelete(_.ref, bulkWriter);
 
       // Delete the files from storage
       await storage()
@@ -27,7 +45,10 @@ export default functions.firestore
     }
   });
 
-export const deleteLocAndGetMembers = async (organizationId: string) => {
+export const deleteLocations = async (
+  organizationId: string,
+  bulkWriter: firestore.BulkWriter
+) => {
   const locations = await firestore()
     .collection("Locations")
     .where("organizationId", "==", organizationId)
@@ -38,12 +59,7 @@ export const deleteLocAndGetMembers = async (organizationId: string) => {
     return;
   }
 
-  const bulkWriter = firestore().bulkWriter();
-
   locations.forEach((location) => {
     bulkWriter.delete(location.ref);
   });
-
-  // Commit the batch
-  await bulkWriter.close();
 };

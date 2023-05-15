@@ -15,10 +15,9 @@ export default functions.firestore
 
     const { employees: newEmployees } = newDocument as IEmployeesDocument;
     const { employees: oldEmployees } = oldDocument as IEmployeesDocument;
-    if (!newEmployees || !oldEmployees) return;
 
-    const newEmployeesValues = Object.values(newEmployees);
-    const oldEmployeesValues = Object.values(oldEmployees);
+    const newEmployeesValues = newEmployees ? Object.values(newEmployees) : [];
+    const oldEmployeesValues = oldEmployees ? Object.values(oldEmployees) : [];
 
     await updatedEmployees(locationId, oldEmployeesValues, newEmployeesValues);
   });

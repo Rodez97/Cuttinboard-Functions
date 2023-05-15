@@ -6,6 +6,7 @@ import { ILocation } from "@cuttinboard-solutions/types-helpers";
 import { conversationConverter } from "../../models/converters/directMessageConverter";
 import { orgEmployeeConverter } from "../../models/converters/employeeConverter";
 import { clearUserClaimsLocation } from "../../services/auth";
+import { organizationConverter } from "../../models/converters/organizationConverter";
 
 /**
  * Clean the location data from the organization
@@ -54,7 +55,10 @@ export default functions.firestore
 
     // Decrease the locations count by one and update the organization
     bulkWriter.update(
-      firestore().collection("Organizations").doc(organizationId),
+      firestore()
+        .collection("Organizations")
+        .doc(organizationId)
+        .withConverter(organizationConverter),
       {
         locations: firestore.FieldValue.increment(-1),
       }

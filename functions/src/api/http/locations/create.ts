@@ -13,7 +13,8 @@ import {
 import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
 import * as yup from "yup";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions/v1";
+import { logger } from "firebase-functions";
+import { organizationConverter } from "../../../models/converters/organizationConverter";
 
 interface ICreateLocationData {
   location: {
@@ -27,6 +28,23 @@ interface ICreateLocationData {
     email: string;
   };
 }
+
+const GeneralManagerSchema = yup.object().shape({
+  name: yup.string().required(),
+  lastName: yup.string().required(),
+  email: yup.string().email().required(),
+});
+
+// Initialize the stripe client
+const stripe = new Stripe(MainVariables.stripeSecretKey, {
+  apiVersion: "2020-08-27",
+  // Register extension as a Stripe plugin
+  // https://stripe.com/docs/building-plugins#setappinfo
+  appInfo: {
+    name: "Cuttinboard-Firebase",
+    version: "0.1",
+  },
+});
 
 export default onCall<ICreateLocationData>(async (request) => {
   const { auth, data } = request;
@@ -79,17 +97,6 @@ export default onCall<ICreateLocationData>(async (request) => {
 
   const batch = firestore().batch();
 
-  // Initialize the stripe client
-  const stripe = new Stripe(MainVariables.stripeSecretKey, {
-    apiVersion: "2020-08-27",
-    // Register extension as a Stripe plugin
-    // https://stripe.com/docs/building-plugins#setappinfo
-    appInfo: {
-      name: "Cuttinboard-Firebase",
-      version: "0.1",
-    },
-  });
-
   try {
     // Get the subscription
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
@@ -130,6 +137,15 @@ export default onCall<ICreateLocationData>(async (request) => {
     // Set the location data
     batch.set(locationRef, locationMain, { merge: true });
 
+    // Increment the locations count in the organization document
+    const organizationRef = firestore()
+      .collection("Organizations")
+      .doc(uid)
+      .withConverter(organizationConverter);
+    batch.update(organizationRef, {
+      locations: firestore.FieldValue.increment(1),
+    });
+
     // Create initial data for the location
     const locationChecklist = await firestore()
       .collection("Templates")
@@ -155,13 +171,7 @@ export default onCall<ICreateLocationData>(async (request) => {
     // If the general manager data is provided then create the employee.
     if (generalManager) {
       // Validate the general manager data
-      const schema = yup.object().shape({
-        name: yup.string().required(),
-        lastName: yup.string().required(),
-        email: yup.string().email().required(),
-      });
-
-      const validData = await schema.validate(generalManager);
+      const validData = await GeneralManagerSchema.validate(generalManager);
 
       // Create the employee
       await inviteEmployee({

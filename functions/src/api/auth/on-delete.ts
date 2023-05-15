@@ -5,8 +5,11 @@ import { deleteFiles } from "../../services/deleteFiles";
 import { updateUserMetadata } from "../../services/updateUserMetadata";
 import Stripe from "stripe";
 import { MainVariables } from "../../config";
-import { locationConverter } from "../../models/converters/locationConverter";
-import { employeeDocConverter } from "../../models/converters/employeeConverter";
+import {
+  employeeDocConverter,
+  orgEmployeeConverter,
+} from "../../models/converters/employeeConverter";
+import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
 
 /**
  * When a user is deleted, delete their data from the locations and organizations
@@ -18,14 +21,24 @@ import { employeeDocConverter } from "../../models/converters/employeeConverter"
  * - Update the metadata for the user's deleted state.
  */
 export default auth.user().onDelete(async (user) => {
+  // Get the user's profile from the database.
+  const userDoc = await firestore()
+    .collection("Users")
+    .doc(user.uid)
+    .withConverter(cuttinboardUserConverter)
+    .get();
+
+  // Get the user's profile data.
+  const userData = userDoc.data();
+
   // Initialize the update batch.
   const bulkWriter = firestore().bulkWriter();
 
   // Delete the user's profile from locations collection.
-  await deleteEmployeeLocationProfiles(user.uid, bulkWriter);
+  deleteEmployeeLocationProfiles(user.uid, bulkWriter, userData?.locations);
 
   // Delete the user's profile from organizations collection.
-  await deleteEmployeeOrganizationsProfiles(user.uid, bulkWriter);
+  deleteEmployeeOrganizationsProfiles(user.uid, bulkWriter);
 
   // Clean up the user's direct messages.
   await deleteDMMember(user.uid, bulkWriter);
@@ -48,21 +61,6 @@ export default auth.user().onDelete(async (user) => {
   });
 });
 
-const deleteUserProfile = async (
-  userId: string,
-  bulkWriter: firestore.BulkWriter
-) => {
-  try {
-    // Delete the user's global profile and all its subcollections.
-    await firestore().recursiveDelete(
-      firestore().collection("Users").doc(userId),
-      bulkWriter
-    );
-  } catch (error: any) {
-    logger.error(error);
-  }
-};
-
 /**
  * This function deletes a Stripe customer with a given email address.
  * @param {string} email - The email of the Stripe customer that needs to be deleted.
@@ -80,11 +78,13 @@ const deleteStripeCustomer = async (email: string) => {
       },
     });
 
+    // Get the customer with the given email address.
     const customer = await stripe.customers.list({
       limit: 1,
       email,
     });
 
+    // If the customer exists, delete it.
     if (customer.data.length > 0) {
       await stripe.customers.del(customer.data[0].id);
     }
@@ -94,18 +94,17 @@ const deleteStripeCustomer = async (email: string) => {
 };
 
 /**
- * This function deletes a user from a direct message chat or deletes the chat entirely if it was a 1-1
- * chat.
- * @param {string} userId - a string representing the ID of the user whose direct messages need to be
- * modified or deleted.
- * @param bulkWriter - A Firestore BulkWriter object, which allows for efficient batched writes to
- * Firestore.
+ * Deletes a member from direct messages.
+ * @param userId - The ID of the user to delete from direct messages.
+ * @param bulkWriter - The Firestore BulkWriter instance.
+ * @throws If there is an error while deleting the member.
  */
 const deleteDMMember = async (
   userId: string,
   bulkWriter: firestore.BulkWriter
-) => {
+): Promise<void> => {
   try {
+    // Get all direct messages where the user is a member.
     const directMessageSnapshots = await firestore()
       .collection("directMessages")
       .where(`members.${userId}._id`, "==", userId)
@@ -115,8 +114,10 @@ const deleteDMMember = async (
     directMessageSnapshots.forEach((chatSnapshot) => {
       const { onlyOneMember } = chatSnapshot.data();
       if (onlyOneMember) {
+        // If there is only one member in the direct message, delete it.
         bulkWriter.delete(chatSnapshot.ref);
       } else {
+        // Otherwise, remove the user from the direct message.
         bulkWriter.set(
           chatSnapshot.ref,
           {
@@ -131,56 +132,72 @@ const deleteDMMember = async (
     });
   } catch (error: any) {
     logger.error(error);
+    throw new Error("Failed to delete member from direct messages.");
   }
 };
 
-const deleteEmployeeLocationProfiles = async (
+const deleteEmployeeLocationProfiles = (
   userId: string,
-  bulkWriter: firestore.BulkWriter
+  bulkWriter: firestore.BulkWriter,
+  locations?: string[]
 ) => {
-  try {
-    // Get the locations where the user is an employee
-    const locations = await firestore()
+  if (!locations || locations.length === 0) {
+    // If the user is not an employee of any location, return
+    return;
+  }
+
+  locations.forEach((locationId) => {
+    const employeesDocRef = firestore()
       .collection("Locations")
-      .where(`members`, "array-contains", userId)
-      .withConverter(locationConverter)
-      .get();
-
-    if (locations.size > 0) {
-      locations.forEach((ep) => {
-        const employeesDocRef = ep.ref
-          .collection("employees")
-          .doc("employeesDocument")
-          .withConverter(employeeDocConverter);
-        // Update the employee profile on the locations
-        bulkWriter.update(
-          employeesDocRef,
-          `employees.${userId}`,
-          firestore.FieldValue.delete()
-        );
-      });
-    }
-  } catch (error: any) {
-    logger.error(error);
-  }
+      .doc(locationId)
+      .collection("employees")
+      .doc("employeesDocument")
+      .withConverter(employeeDocConverter);
+    // Delete the employee from the location's employees document
+    bulkWriter.update(
+      employeesDocRef,
+      `employees.${userId}`,
+      firestore.FieldValue.delete()
+    );
+  });
 };
 
-const deleteEmployeeOrganizationsProfiles = async (
+const deleteEmployeeOrganizationsProfiles = (
+  userId: string,
+  bulkWriter: firestore.BulkWriter,
+  organizations?: string[]
+) => {
+  if (!organizations || organizations.length === 0) {
+    // If the user is not an employee of any organization, return
+    return;
+  }
+
+  organizations.forEach((organizationId) => {
+    const organizationDocRef = firestore()
+      .collection("Organizations")
+      .doc(organizationId)
+      .collection("employees")
+      .doc(userId)
+      .withConverter(orgEmployeeConverter);
+    // Delete the employee from the organization's employees collection
+    bulkWriter.delete(organizationDocRef);
+  });
+};
+
+/**
+ * Deletes a user's profile and all its subcollections.
+ * @param userId The ID of the user to delete.
+ * @param bulkWriter The Firestore BulkWriter instance.
+ */
+const deleteUserProfile = async (
   userId: string,
   bulkWriter: firestore.BulkWriter
 ) => {
   try {
-    // Get the locations where the user is an employee
-    const employeeOrganizationProfiles = await firestore()
-      .collectionGroup("employees")
-      .where(`id`, "==", userId)
-      .get();
-
-    if (employeeOrganizationProfiles.size > 0) {
-      employeeOrganizationProfiles.forEach((ep) => {
-        bulkWriter.delete(ep.ref);
-      });
-    }
+    await firestore().recursiveDelete(
+      firestore().collection("Users").doc(userId),
+      bulkWriter
+    );
   } catch (error: any) {
     logger.error(error);
   }
