@@ -2,83 +2,109 @@ import { ICuttinboardUser } from "@cuttinboard-solutions/types-helpers";
 import { firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { directMessageConverter } from "../../models/converters/directMessageConverter";
-import { locationConverter } from "../../models/converters/locationConverter";
-import { employeeDocConverter } from "../../models/converters/employeeConverter";
+import {
+  employeeDocConverter,
+  orgEmployeeConverter,
+} from "../../models/converters/employeeConverter";
+import { isEqual } from "lodash";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 
 /**
  * Update employee data on the locations or organizations when the user profile is updated
  */
-export default functions.firestore
-  .document(`/Users/{uid}`)
-  .onUpdate(async (change, context) => {
-    const { uid } = context.params;
-    const bulkWriter = firestore().bulkWriter();
+export default onDocumentUpdated(`/Users/{uid}`, async (event) => {
+  const { uid } = event.params;
 
-    // Extract the properties that we do not want to propagate to the locations or organizations
-    const { customerId, subscriptionId, paymentMethods, ...afterEmployeeData } =
-      change.after.data() as ICuttinboardUser;
+  const {
+    customerId: bCustomerId,
+    subscriptionId: bSubscriptionId,
+    paymentMethods: bPaymentMethods,
+    organizations: bOrganizations,
+    locations: bLocations,
+    organizationsRelationship: bOrganizationsRelationship,
+    ...bAfterEmployeeData
+  } = event.data?.before.data() as ICuttinboardUser;
 
-    // Update the employee's profile on the locations
-    await updateEmployeeLocationProfiles(uid, bulkWriter, afterEmployeeData);
+  // Extract the properties that we do not want to propagate to the locations or organizations
+  const {
+    customerId,
+    subscriptionId,
+    paymentMethods,
+    organizations,
+    locations,
+    organizationsRelationship,
+    ...afterEmployeeData
+  } = event.data?.after.data() as ICuttinboardUser;
 
-    // Update the employee's profile on the organizations
+  // If the employee data has not changed, return
+  if (isEqual(bAfterEmployeeData, afterEmployeeData)) {
+    return;
+  }
+
+  const bulkWriter = firestore().bulkWriter();
+
+  // Update the employee's profile on the locations
+  if (locations && locations.length > 0) {
+    await updateEmployeeLocationProfiles(
+      uid,
+      bulkWriter,
+      afterEmployeeData,
+      locations
+    );
+  }
+
+  // Update the employee's profile on the organizations
+  if (organizations && organizations.length > 0) {
     await updateEmployeeOrganizationsProfiles(
       uid,
       bulkWriter,
-      afterEmployeeData
+      afterEmployeeData,
+      organizations
     );
+  }
 
-    const { name, lastName, avatar } = change.before.data() as ICuttinboardUser;
+  const { name, lastName, avatar } =
+    event.data?.before.data() as ICuttinboardUser;
 
-    if (
-      name !== afterEmployeeData.name ||
-      lastName !== afterEmployeeData.lastName ||
-      avatar !== afterEmployeeData.avatar
-    ) {
-      // Update the employee's profile on the direct messages
-      await updateDMMember(uid, bulkWriter, afterEmployeeData);
-    }
+  if (
+    name !== afterEmployeeData.name ||
+    lastName !== afterEmployeeData.lastName ||
+    avatar !== afterEmployeeData.avatar
+  ) {
+    // Update the employee's profile on the direct messages
+    await updateDMMember(uid, bulkWriter, afterEmployeeData);
+  }
 
-    try {
-      // Commit the batch
-      await bulkWriter.close();
-    } catch (error: any) {
-      functions.logger.error(error);
-      throw new functions.https.HttpsError("unknown", error.message);
-    }
-  });
+  try {
+    // Commit the batch
+    await bulkWriter.close();
+  } catch (error: any) {
+    functions.logger.error(error);
+    throw new functions.https.HttpsError("unknown", error.message);
+  }
+});
 
 const updateEmployeeLocationProfiles = async (
   userId: string,
   bulkWriter: firestore.BulkWriter,
-  afterEmployeeData: Partial<ICuttinboardUser>
+  afterEmployeeData: Partial<ICuttinboardUser>,
+  locations: string[]
 ) => {
   try {
-    // Get the locations where the user is an employee
-    const locations = await firestore()
-      .collection("Locations")
-      .where(`members`, "array-contains", userId)
-      .withConverter(locationConverter)
-      .get();
-
-    if (locations.size > 0) {
-      locations.forEach((ep) => {
-        const employeesDocRef = ep.ref
-          .collection("employees")
-          .doc("employeesDocument")
-          .withConverter(employeeDocConverter);
-        // Update the employee profile on the locations
-        bulkWriter.set(
-          employeesDocRef,
-          {
-            employees: {
-              [userId]: afterEmployeeData,
-            },
-          },
-          { merge: true }
-        );
-      });
-    }
+    locations.forEach((locationId) => {
+      const employeesDocRef = firestore()
+        .collection("Locations")
+        .doc(locationId)
+        .collection("employees")
+        .doc("employeesDocument")
+        .withConverter(employeeDocConverter);
+      // Update the employee profile on the locations
+      bulkWriter.update(
+        employeesDocRef,
+        `employees.${userId}`,
+        afterEmployeeData
+      );
+    });
   } catch (error: any) {
     functions.logger.error(error);
   }
@@ -87,20 +113,19 @@ const updateEmployeeLocationProfiles = async (
 const updateEmployeeOrganizationsProfiles = async (
   userId: string,
   bulkWriter: firestore.BulkWriter,
-  afterEmployeeData: Partial<ICuttinboardUser>
+  afterEmployeeData: Partial<ICuttinboardUser>,
+  organizations: string[]
 ) => {
   try {
-    // Get the locations where the user is an employee
-    const employeeOrganizationProfiles = await firestore()
-      .collectionGroup("employees")
-      .where(`id`, "==", userId)
-      .get();
-
-    if (employeeOrganizationProfiles.size > 0) {
-      employeeOrganizationProfiles.forEach((ep) => {
-        bulkWriter.set(ep.ref, afterEmployeeData, { merge: true });
-      });
-    }
+    organizations.forEach((organizationId) => {
+      const employeesDocRef = firestore()
+        .collection("Organizations")
+        .doc(organizationId)
+        .collection("employees")
+        .doc(userId)
+        .withConverter(orgEmployeeConverter);
+      bulkWriter.update(employeesDocRef, afterEmployeeData);
+    });
   } catch (error: any) {
     functions.logger.error(error);
   }
