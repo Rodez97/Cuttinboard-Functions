@@ -1,5 +1,6 @@
 import {
   IConversation,
+  ICuttinboardUser,
   IEmployee,
   RoleAccessLevels,
 } from "@cuttinboard-solutions/types-helpers";
@@ -115,7 +116,7 @@ export async function removeEmployeesFromAllConversations(
       const conversations = await firestore()
         .collection("conversations")
         .where("locationId", "==", locationId)
-        .where(`members.${emp.id}`, "in", [true, false])
+        .where(`members.${emp.id}.muted`, "in", [true, false])
         .withConverter(conversationConverter)
         .get();
 
@@ -215,10 +216,12 @@ export async function removeEmployeesMembershipToLocation(
 ) {
   try {
     const operations = employees.map(async (emp) => {
-      const fieldsOrPrecondition: any[] = [
-        `organizationsRelationship.${organizationId}`,
-        firestore.FieldValue.arrayRemove(locationId),
-      ];
+      const fieldsOrPrecondition: PartialWithFieldValue<ICuttinboardUser> = {
+        organizationsRelationship: {
+          [organizationId]: firestore.FieldValue.arrayRemove(locationId),
+        },
+        locations: firestore.FieldValue.arrayRemove(locationId),
+      };
 
       const onlyEmployee = emp.role >= RoleAccessLevels.GENERAL_MANAGER;
 
@@ -242,19 +245,12 @@ export async function removeEmployeesMembershipToLocation(
         ) {
           // If the employee doesn't have other locations in the same organization
           // Remove the organization from the employee's organizations array
-          fieldsOrPrecondition.push(
-            "organizations",
-            firestore.FieldValue.arrayRemove(organizationId)
-          );
+          fieldsOrPrecondition.organizations =
+            firestore.FieldValue.arrayRemove(organizationId);
         }
       }
 
-      bulkWriter.update(
-        userDocumentRef,
-        "locations",
-        firestore.FieldValue.arrayRemove(locationId),
-        ...fieldsOrPrecondition
-      );
+      bulkWriter.set(userDocumentRef, fieldsOrPrecondition, { merge: true });
     });
 
     await Promise.all(operations);

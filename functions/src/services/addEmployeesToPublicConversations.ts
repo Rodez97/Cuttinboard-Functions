@@ -1,4 +1,9 @@
-import { IEmployee, PrivacyLevel } from "@cuttinboard-solutions/types-helpers";
+import {
+  IConversation,
+  IEmployee,
+  PrivacyLevel,
+  getEmployeeFullName,
+} from "@cuttinboard-solutions/types-helpers";
 import { firestore } from "firebase-admin";
 import { conversationConverter } from "../models/converters/directMessageConverter";
 import { logger } from "firebase-functions";
@@ -30,11 +35,7 @@ export async function addEmployeesToPublicConversations(
           const { privacyLevel, position } = conversationDoc.data();
           const conversationRef = conversationDoc.ref;
 
-          const documentUpdates: {
-            members: {
-              [key: string]: false;
-            };
-          } = {
+          const documentUpdates: Partial<IConversation> = {
             members: {},
           };
 
@@ -46,10 +47,24 @@ export async function addEmployeesToPublicConversations(
               employee.positions.length > 0 &&
               employee.positions.includes(position)
             ) {
-              documentUpdates.members[employee.id] = false;
+              documentUpdates.members = {
+                ...documentUpdates.members,
+                [employee.id]: {
+                  name: getEmployeeFullName(employee),
+                  avatar: employee.avatar,
+                  muted: false,
+                },
+              };
             }
             if (privacyLevel === PrivacyLevel.PUBLIC) {
-              documentUpdates.members[employee.id] = false;
+              documentUpdates.members = {
+                ...documentUpdates.members,
+                [employee.id]: {
+                  name: getEmployeeFullName(employee),
+                  avatar: employee.avatar,
+                  muted: false,
+                },
+              };
             }
           });
 

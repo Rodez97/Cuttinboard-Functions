@@ -2,6 +2,7 @@ import {
   IEmployee,
   IOrganizationKey,
   PrivacyLevel,
+  getEmployeeFullName,
 } from "@cuttinboard-solutions/types-helpers";
 import { auth, database, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
@@ -87,7 +88,7 @@ async function updateEmployeesData(
       const removedPositions = difference(beforePositions, afterPositions);
 
       await processChangedPositions(
-        employee.id,
+        employee,
         locationId,
         addedPositions,
         removedPositions,
@@ -150,7 +151,7 @@ async function updateEmployeeClaims(
 }
 
 async function processChangedPositions(
-  employeeId: string,
+  employee: IEmployee,
   locationId: string,
   newPositions: string[],
   oldPositions: string[],
@@ -176,7 +177,7 @@ async function processChangedPositions(
           continue;
         }
 
-        if (guests && guests.includes(employeeId)) {
+        if (guests && guests.includes(employee.id)) {
           // The employee is a guest in this conversation
           continue;
         }
@@ -186,7 +187,11 @@ async function processChangedPositions(
             conversation.ref,
             {
               members: {
-                [employeeId]: false,
+                [employee.id]: {
+                  name: getEmployeeFullName(employee),
+                  avatar: employee.avatar,
+                  muted: false,
+                },
               },
             },
             { merge: true }
@@ -194,13 +199,13 @@ async function processChangedPositions(
         }
         if (oldPositions.includes(position)) {
           dbUpdates[
-            `users/${employeeId}/notifications/conv/${conversation.id}`
+            `users/${employee.id}/notifications/conv/${conversation.id}`
           ] = null;
           bulkWriter.set(
             conversation.ref,
             {
               members: {
-                [employeeId]: firestore.FieldValue.delete(),
+                [employee.id]: firestore.FieldValue.delete(),
               },
             },
             { merge: true }

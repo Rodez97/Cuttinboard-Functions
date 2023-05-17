@@ -1,7 +1,10 @@
 import { ICuttinboardUser } from "@cuttinboard-solutions/types-helpers";
 import { firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
-import { directMessageConverter } from "../../models/converters/directMessageConverter";
+import {
+  conversationConverter,
+  directMessageConverter,
+} from "../../models/converters/directMessageConverter";
 import {
   employeeDocConverter,
   orgEmployeeConverter,
@@ -73,6 +76,8 @@ export default onDocumentUpdated(`/Users/{uid}`, async (event) => {
   ) {
     // Update the employee's profile on the direct messages
     await updateDMMember(uid, bulkWriter, afterEmployeeData);
+    // Update the employee's profile on the conversations
+    await updateConversationMember(uid, bulkWriter, afterEmployeeData);
   }
 
   try {
@@ -99,10 +104,14 @@ const updateEmployeeLocationProfiles = async (
         .doc("employeesDocument")
         .withConverter(employeeDocConverter);
       // Update the employee profile on the locations
-      bulkWriter.update(
+      bulkWriter.set(
         employeesDocRef,
-        `employees.${userId}`,
-        afterEmployeeData
+        {
+          employees: {
+            [userId]: afterEmployeeData,
+          },
+        },
+        { merge: true }
       );
     });
   } catch (error: any) {
@@ -124,7 +133,7 @@ const updateEmployeeOrganizationsProfiles = async (
         .collection("employees")
         .doc(userId)
         .withConverter(orgEmployeeConverter);
-      bulkWriter.update(employeesDocRef, afterEmployeeData);
+      bulkWriter.set(employeesDocRef, afterEmployeeData, { merge: true });
     });
   } catch (error: any) {
     functions.logger.error(error);
@@ -154,6 +163,46 @@ const updateDMMember = async (
           members: {
             [userId]: {
               _id: userId,
+              name: fullName,
+              avatar: afterEmployeeData.avatar,
+            },
+          },
+        },
+        { merge: true }
+      )
+    );
+  } catch (error: any) {
+    functions.logger.error(error);
+  }
+};
+
+const updateConversationMember = async (
+  userId: string,
+  bulkWriter: firestore.BulkWriter,
+  afterEmployeeData: Partial<ICuttinboardUser>
+) => {
+  const fullName = `${afterEmployeeData.name} ${afterEmployeeData.lastName}`;
+
+  try {
+    // Get all conversations that the employee is a member of
+    const conversations = await firestore()
+      .collection("conversations")
+      .where(`members.${userId}.muted`, "in", [true, false])
+      .withConverter(conversationConverter)
+      .get();
+
+    if (conversations.empty) {
+      return;
+    }
+
+    // Update the employee's name and avatar on the conversations
+    conversations.forEach((conversation) =>
+      bulkWriter.set(
+        conversation.ref,
+        {
+          // Update the employee's name and avatar on the conversations
+          members: {
+            [userId]: {
               name: fullName,
               avatar: afterEmployeeData.avatar,
             },

@@ -53,7 +53,7 @@ export default functions.firestore
 
     const unmutedMembers = conversationDocumentData.members
       ? Object.entries(conversationDocumentData.members)
-          .filter(([member, muted]) => member !== senderId && !muted)
+          .filter(([member, { muted }]) => member !== senderId && !muted)
           .map(([member]) => member)
       : [];
 

@@ -32,15 +32,18 @@ async function updateLocationsAndEmployees(
   const bulkWriter = firestore().bulkWriter();
 
   // Remove the organization from the user's organization list.
-  bulkWriter.update(
+  bulkWriter.set(
     firestore()
       .collection("Users")
       .doc(employeeId)
       .withConverter(cuttinboardUserConverter),
-    "organizations",
-    firestore.FieldValue.arrayRemove(organizationId),
-    `organizationsRelationship.${organizationId}`,
-    firestore.FieldValue.delete()
+    {
+      organizations: firestore.FieldValue.arrayRemove(organizationId),
+      organizationsRelationship: {
+        [organizationId]: firestore.FieldValue.delete(),
+      },
+    },
+    { merge: true }
   );
 
   if (supervisingLocations && supervisingLocations.length > 0) {
