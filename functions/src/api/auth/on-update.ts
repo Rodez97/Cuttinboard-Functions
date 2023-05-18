@@ -11,6 +11,8 @@ import {
 } from "../../models/converters/employeeConverter";
 import { isEqual } from "lodash";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
+import { locationConverter } from "../../models/converters/locationConverter";
 
 /**
  * Update employee data on the locations or organizations when the user profile is updated
@@ -96,24 +98,56 @@ const updateEmployeeLocationProfiles = async (
   locations: string[]
 ) => {
   try {
-    locations.forEach((locationId) => {
+    const operations = locations.map(async (locationId) => {
       const employeesDocRef = firestore()
         .collection("Locations")
         .doc(locationId)
         .collection("employees")
         .doc("employeesDocument")
         .withConverter(employeeDocConverter);
-      // Update the employee profile on the locations
-      bulkWriter.set(
-        employeesDocRef,
-        {
-          employees: {
-            [userId]: afterEmployeeData,
+      // Check if the employee has a profile on the location
+      const employeeDocSnap = await employeesDocRef.get();
+      if (
+        employeeDocSnap.exists &&
+        employeeDocSnap.get(`employees.${userId}.id`) === userId
+      ) {
+        // If the employee has a profile on the location, update it
+        bulkWriter.set(
+          employeesDocRef,
+          {
+            employees: {
+              [userId]: afterEmployeeData,
+            },
           },
-        },
-        { merge: true }
-      );
+          { merge: true }
+        );
+      } else {
+        // If the employee does not have a profile on the location, remove the location from the employee's locations and the employee from the location's employees
+        bulkWriter.set(
+          firestore()
+            .collection("Users")
+            .doc(userId)
+            .withConverter(cuttinboardUserConverter),
+          {
+            locations: firestore.FieldValue.arrayRemove(locationId),
+          },
+          { merge: true }
+        );
+
+        bulkWriter.set(
+          firestore()
+            .collection("Locations")
+            .doc(locationId)
+            .withConverter(locationConverter),
+          {
+            members: firestore.FieldValue.arrayRemove(userId),
+          },
+          { merge: true }
+        );
+      }
     });
+
+    await Promise.all(operations);
   } catch (error: any) {
     functions.logger.error(error);
   }
@@ -126,15 +160,22 @@ const updateEmployeeOrganizationsProfiles = async (
   organizations: string[]
 ) => {
   try {
-    organizations.forEach((organizationId) => {
+    const operations = organizations.map(async (organizationId) => {
       const employeesDocRef = firestore()
         .collection("Organizations")
         .doc(organizationId)
         .collection("employees")
         .doc(userId)
         .withConverter(orgEmployeeConverter);
-      bulkWriter.set(employeesDocRef, afterEmployeeData, { merge: true });
+      // Check if the employee has a profile on the organization
+      const employeeDocSnap = await employeesDocRef.get();
+      if (employeeDocSnap.exists) {
+        // If the employee has a profile on the organization, update it
+        bulkWriter.set(employeesDocRef, afterEmployeeData, { merge: true });
+      }
     });
+
+    await Promise.all(operations);
   } catch (error: any) {
     functions.logger.error(error);
   }

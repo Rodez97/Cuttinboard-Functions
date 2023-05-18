@@ -83,6 +83,10 @@ async function updateGlobalUsage(
       // Get the storage limit of the location
       const locationStorageLimit = Number(limits.storage);
 
+      transaction.update(organizationRef, {
+        storageUsed: firestore.FieldValue.increment(fileSize),
+      });
+
       if (storageUsed + fileSize > locationStorageLimit) {
         // ! If the storage limit is exceeded then delete the file and the document
         deleteFile = true;
@@ -97,17 +101,15 @@ async function updateGlobalUsage(
             .collection("content")
             .doc(fileId)
         );
-      } else {
-        // ! If the storage limit is not exceeded then update the storage usage of the location
-        transaction.update(organizationRef, {
-          storageUsed: firestore.FieldValue.increment(fileSize),
-        });
       }
     });
 
     if (deleteFile) {
       // Delete the file
       await storage().bucket().file(filePath).delete();
+      functions.logger.warn(
+        "File deleted successfully, storage limit exceeded, file: " + filePath
+      );
     }
   } catch (error: any) {
     functions.logger.error(error);
@@ -146,6 +148,10 @@ async function updateLocationUsage(
       // Get the storage limit of the location
       const locationStorageLimit = Number(limits.storage);
 
+      transaction.update(locationRefRef, {
+        storageUsed: firestore.FieldValue.increment(fileSize),
+      });
+
       if (storageUsed + fileSize > locationStorageLimit) {
         // ! If the storage limit is exceeded then delete the file and the document
         deleteFile = true;
@@ -160,11 +166,6 @@ async function updateLocationUsage(
             .collection("content")
             .doc(fileId)
         );
-      } else {
-        // ! If the storage limit is not exceeded then update the storage usage of the location
-        transaction.update(locationRefRef, {
-          storageUsed: firestore.FieldValue.increment(fileSize),
-        });
       }
     });
 
