@@ -200,7 +200,6 @@ export default onCall<ICreateLocationData>(async (request) => {
           storage: "5e+9",
         },
         storageUsed: 0,
-        cancellationDate: firestore.FieldValue.delete(),
       }
     );
 
