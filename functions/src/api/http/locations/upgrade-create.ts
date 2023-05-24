@@ -2,36 +2,38 @@ import { firestore } from "firebase-admin";
 import Stripe from "stripe";
 import { MainVariables } from "../../../config";
 import short from "short-uuid";
-import { handleError } from "../../../services/handleError";
 import { inviteEmployee } from "../../../services/inviteEmployee";
 import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
 import {
   DefaultScheduleSettings,
   ICuttinboardUser,
   ILocation,
-  ILocationAddress,
+  ILocationLimits,
   IOrganizationEmployee,
   RoleAccessLevels,
 } from "@cuttinboard-solutions/types-helpers";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { PartialWithFieldValue } from "firebase-admin/firestore";
 import { organizationConverter } from "../../../models/converters/organizationConverter";
+import { ICreateLocationData } from "../../../models/ICreateLocationData";
+import { GeneralManagerSchema } from "../../../services/validationSchemes";
+import { logger } from "firebase-functions";
 
-interface IUpgradeOwnerData {
-  locationName: string;
-  intId?: string;
-  address?: ILocationAddress;
-  gm: {
-    name: string;
-    lastName: string;
-    email: string;
-  } | null;
-}
+// Initialize Stripe
+const stripe = new Stripe(MainVariables.stripeSecretKey, {
+  apiVersion: "2020-08-27",
+  // Register extension as a Stripe plugin
+  // https://stripe.com/docs/building-plugins#setappinfo
+  appInfo: {
+    name: "Cuttinboard-Firebase",
+    version: "0.1",
+  },
+});
 
-export default onCall<IUpgradeOwnerData>(async (request) => {
+export default onCall<ICreateLocationData>(async (request) => {
   const { auth, data } = request;
 
-  if (!auth) {
+  if (!auth || !auth.token || !auth.token.email) {
     // If the user is not authenticated
     throw new HttpsError(
       "unauthenticated",
@@ -39,66 +41,47 @@ export default onCall<IUpgradeOwnerData>(async (request) => {
     );
   }
 
-  const { locationName, gm, intId, address } = data;
+  // Location creation data
+  const { location, generalManager } = data;
 
   const { uid, email } = auth.token;
 
-  if (!email) {
-    // If the email or uid is not valid then throw an error
+  if (!location || !location.name) {
+    // If the required data is not provided then return an error.
     throw new HttpsError(
       "invalid-argument",
-      "The function must be called with a valid email!"
+      "The function must be called with valid data!"
     );
   }
 
-  // Initialize Stripe
-  const stripe = new Stripe(MainVariables.stripeSecretKey, {
-    apiVersion: "2020-08-27",
-    // Register extension as a Stripe plugin
-    // https://stripe.com/docs/building-plugins#setappinfo
-    appInfo: {
-      name: "Cuttinboard-Firebase",
-      version: "0.1",
-    },
-  });
+  // Get user data
+  const userDocument = (
+    await firestore()
+      .collection("Users")
+      .doc(uid)
+      .withConverter(cuttinboardUserConverter)
+      .get()
+  ).data();
 
-  if (!stripe) {
-    // If stripe is not initialized then throw an error
+  if (!userDocument) {
+    // If the user does not exist then return an error.
+    throw new HttpsError("not-found", "The user document does not exist!");
+  }
+
+  const { customerId, subscriptionId, name, lastName, phoneNumber, avatar } =
+    userDocument;
+
+  if (subscriptionId) {
+    // If the user already has a subscription then throw an error
     throw new HttpsError(
-      "internal",
-      "The stripe client could not be initialized!"
+      "already-exists",
+      "The user already has a subscription!"
     );
   }
 
-  const userDocumentRef = firestore()
-    .collection("Users")
-    .doc(uid)
-    .withConverter(cuttinboardUserConverter);
+  const batch = firestore().batch();
 
   try {
-    // Check if user is already a customer
-    const userDocumentSnap = await userDocumentRef.get();
-
-    const userData = userDocumentSnap.data();
-
-    if (!userData) {
-      // If the user document does not exist then throw an error
-      throw new HttpsError("not-found", "The user document does not exist!");
-    }
-
-    const { customerId, subscriptionId, name, lastName, phoneNumber, avatar } =
-      userData;
-
-    if (subscriptionId) {
-      // If the user already has a subscription then throw an error
-      throw new HttpsError(
-        "already-exists",
-        "The user already has a subscription!"
-      );
-    }
-
-    const batch = firestore().batch();
-
     const userUpdates: PartialWithFieldValue<ICuttinboardUser> = {
       organizations: firestore.FieldValue.arrayUnion(uid),
     };
@@ -129,7 +112,7 @@ export default onCall<IUpgradeOwnerData>(async (request) => {
     // Create the subscription
     const subscription = await stripe.subscriptions.create({
       customer: userUpdates.customerId,
-      items: [{ price: MainVariables.stripePriceId, quantity: 0 }],
+      items: [{ price: MainVariables.stripePriceId, quantity: 1 }],
       metadata: {
         firebaseUID: uid,
       },
@@ -158,10 +141,10 @@ export default onCall<IUpgradeOwnerData>(async (request) => {
 
     // Create the location data
     const locationMain: ILocation = {
-      name: locationName,
+      ...location,
       subscriptionStatus: subscription.status,
       storageUsed: 0,
-      limits: metadata as unknown as ILocation["limits"],
+      limits: metadata as unknown as ILocationLimits,
       organizationId: uid,
       subscriptionId: subscription.id,
       subItemId: subscription.items.data[0].id,
@@ -174,8 +157,6 @@ export default onCall<IUpgradeOwnerData>(async (request) => {
         positions: [],
         schedule: DefaultScheduleSettings,
       },
-      address,
-      intId,
     };
 
     // Set the location data
@@ -204,7 +185,7 @@ export default onCall<IUpgradeOwnerData>(async (request) => {
     userUpdates.subscriptionId = subscription.id;
 
     // Create the organization document with initial data
-    batch.set(
+    batch.create(
       firestore()
         .collection("Organizations")
         .doc(uid)
@@ -212,14 +193,15 @@ export default onCall<IUpgradeOwnerData>(async (request) => {
       {
         customerId: userUpdates.customerId,
         subscriptionId: userUpdates.subscriptionId,
-        locations: 0,
+        locations: 1,
         subItemId: subscription.items.data[0].id,
         subscriptionStatus: subscription.status,
         limits: {
           storage: "5e+9",
         },
-      },
-      { merge: true }
+        storageUsed: 0,
+        cancellationDate: firestore.FieldValue.delete(),
+      }
     );
 
     // Create the owner - employee document with initial data
@@ -246,16 +228,20 @@ export default onCall<IUpgradeOwnerData>(async (request) => {
     await batch.commit();
 
     // If the general manager data is provided then create the employee.
-    if (gm) {
+    if (generalManager) {
+      // Validate the general manager data
+      const validData = await GeneralManagerSchema.validate(generalManager);
+
       // Create the employee
       await inviteEmployee({
-        ...gm,
+        ...validData,
         locationId,
         organizationId: uid,
         role: RoleAccessLevels.GENERAL_MANAGER,
       });
     }
-  } catch (error) {
-    handleError(error);
+  } catch (error: any) {
+    logger.error(error);
+    throw new HttpsError("unknown", error.message);
   }
 });

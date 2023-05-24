@@ -103,14 +103,18 @@ export default onCall<string>(async (request) => {
     const bulkWriter = firestore().bulkWriter();
 
     // Add the document to the location employees collection
-    bulkWriter.update(
+    bulkWriter.set(
       firestore()
         .collection("Locations")
         .doc(locationId)
         .collection("employees")
         .doc("employeesDocument"),
-      `employees.${auth.uid}`,
-      employee
+      {
+        employees: {
+          [auth.uid]: employee,
+        },
+      },
+      { merge: true }
     );
 
     // Add the employee to the members array in the location document
@@ -121,14 +125,19 @@ export default onCall<string>(async (request) => {
     );
 
     // Add the location to the employee's locations array
-    bulkWriter.update(
+    bulkWriter.set(
       firestore()
         .collection("Users")
         .doc(auth.uid)
         .withConverter(cuttinboardUserConverter),
       {
         locations: firestore.FieldValue.arrayUnion(locationId),
-      }
+        organizations: firestore.FieldValue.arrayUnion(orgId),
+        organizationsRelationship: {
+          [orgId]: firestore.FieldValue.arrayUnion(locationId),
+        },
+      },
+      { merge: true }
     );
 
     // Commit the batch

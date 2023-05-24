@@ -109,11 +109,8 @@ export default functions.firestore
           es: `📅 Horario actualizado`,
         },
         android_channel_id: MainVariables.scheduleChannelId,
-        android_group: `schedule`,
-        android_group_summary: true,
-        thread_id: `schedule`,
-        collapse_id: weekId,
-        summary_arg: "1",
+        collapse_id: "schedule",
+        summary_arg: "Cuttinboard",
         app_url: `cuttinboard://dashboard/stack/myShiftsDashboard`,
       };
 

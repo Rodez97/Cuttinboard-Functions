@@ -95,15 +95,9 @@ export default functions.firestore
             en: `💬 ${senderName} (${conversationDocumentData.name})`,
           },
           android_channel_id: MainVariables.messageBoardsChannelId,
-          android_group: "conversation",
-          android_group_message: {
-            en: "{{notification_count}} new messages",
-            es: "{{notification_count}} nuevos mensajes",
-          },
-          android_group_summary: true,
-          thread_id: "conversation",
-          collapse_id: chatId,
-          summary_arg: "1",
+          thread_id: chatId,
+          android_group: chatId,
+          summary_arg: conversationDocumentData.name,
           app_url: `cuttinboard://dashboard/stack/conversations/${chatId}`,
         };
 

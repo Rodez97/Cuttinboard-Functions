@@ -20,7 +20,7 @@ export const MainVariables = {
   stripeProductId: "prod_MINsulkDhsnMys",
   stripePriceId: "price_1N1WbZCYVoOESVgl3qVWFKiQ",
   scheduleChannelId: "fc5fd854-cd9f-4fe3-9d2d-cf873803f2f4",
-  messageBoardsChannelId: "b5ea2d2d-e156-40c7-9e72-bb9a4a6455c1",
+  messageBoardsChannelId: "98b9fe62-d138-4a5a-84ca-d4d1512b4b06",
   directMessagesChannelId: "731773a1-2ae2-4e56-8fd3-494bb1056d66",
 };
 

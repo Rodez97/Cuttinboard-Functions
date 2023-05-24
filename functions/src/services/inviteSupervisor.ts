@@ -71,6 +71,9 @@ async function createNewSupervisor(
   // add organization to user
   batch.update(userDocumentRef, {
     organizations: firestore.FieldValue.arrayUnion(organizationId),
+    organizationsRelationship: {
+      [organizationId]: firestore.FieldValue.arrayUnion(organizationId),
+    },
   });
 
   // add employee as supervisor for each location
@@ -123,6 +126,9 @@ async function createNewUserAndSupervisor({
       lastName,
       email,
       organizations: [organizationId],
+      organizationsRelationship: {
+        [organizationId]: firestore.FieldValue.arrayUnion(organizationId),
+      },
     },
     { merge: true }
   );

@@ -94,15 +94,9 @@ export default functions.firestore
           es: `💬 Nuevo mensaje de ${senderName}`,
         },
         android_channel_id: MainVariables.directMessagesChannelId,
-        android_group: "directMessages",
-        android_group_message: {
-          en: "{{notification_count}} new messages",
-          es: "{{notification_count}} nuevos mensajes",
-        },
-        android_group_summary: true,
-        thread_id: "directMessages",
-        collapse_id: chatId,
-        summary_arg: "1",
+        android_group: chatId,
+        thread_id: chatId,
+        summary_arg: senderName,
         app_url: `cuttinboard://dashboard/stack/dm/${chatId}`,
       };
 

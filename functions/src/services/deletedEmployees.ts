@@ -217,37 +217,37 @@ export async function removeEmployeesMembershipToLocation(
   try {
     const operations = employees.map(async (emp) => {
       const fieldsOrPrecondition: PartialWithFieldValue<ICuttinboardUser> = {
-        organizationsRelationship: {
-          [organizationId]: firestore.FieldValue.arrayRemove(locationId),
-        },
         locations: firestore.FieldValue.arrayRemove(locationId),
       };
-
-      const onlyEmployee = emp.role >= RoleAccessLevels.GENERAL_MANAGER;
 
       const userDocumentRef = firestore()
         .collection("Users")
         .doc(emp.id)
         .withConverter(cuttinboardUserConverter);
 
-      if (onlyEmployee) {
-        const userData = (await userDocumentRef.get()).data();
+      const userData = (await userDocumentRef.get()).data();
 
-        // Check if the employee has other locations in the same organization
-        const otherLocationsInOrganization =
-          userData?.organizationsRelationship?.[organizationId]?.filter(
-            (loc) => loc !== locationId
-          );
+      // Check if the employee has other locations in the same organization
+      const otherLocationsInOrganization =
+        userData?.organizationsRelationship?.[organizationId]?.filter(
+          (loc) => loc !== locationId
+        );
 
-        if (
-          !otherLocationsInOrganization ||
-          otherLocationsInOrganization.length === 0
-        ) {
-          // If the employee doesn't have other locations in the same organization
-          // Remove the organization from the employee's organizations array
-          fieldsOrPrecondition.organizations =
-            firestore.FieldValue.arrayRemove(organizationId);
-        }
+      if (
+        !otherLocationsInOrganization ||
+        otherLocationsInOrganization.length === 0
+      ) {
+        // If the employee doesn't have other locations in the same organization
+        // Remove the organization from the employee's organizations array
+        fieldsOrPrecondition.organizations =
+          firestore.FieldValue.arrayRemove(organizationId);
+        fieldsOrPrecondition.organizationsRelationship = {
+          [organizationId]: firestore.FieldValue.delete(),
+        };
+      } else {
+        fieldsOrPrecondition.organizationsRelationship = {
+          [organizationId]: firestore.FieldValue.arrayRemove(locationId),
+        };
       }
 
       bulkWriter.set(userDocumentRef, fieldsOrPrecondition, { merge: true });

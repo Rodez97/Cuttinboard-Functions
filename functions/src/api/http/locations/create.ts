@@ -6,34 +6,15 @@ import { inviteEmployee } from "../../../services/inviteEmployee";
 import {
   DefaultScheduleSettings,
   ILocation,
-  ILocationAddress,
   ILocationLimits,
   RoleAccessLevels,
 } from "@cuttinboard-solutions/types-helpers";
 import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
-import * as yup from "yup";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 import { organizationConverter } from "../../../models/converters/organizationConverter";
-
-interface ICreateLocationData {
-  location: {
-    name: string;
-    intId?: string;
-    address?: ILocationAddress;
-  };
-  generalManager?: {
-    name: string;
-    lastName: string;
-    email: string;
-  };
-}
-
-const GeneralManagerSchema = yup.object().shape({
-  name: yup.string().required(),
-  lastName: yup.string().required(),
-  email: yup.string().email().required(),
-});
+import { GeneralManagerSchema } from "../../../services/validationSchemes";
+import { ICreateLocationData } from "../../../models/ICreateLocationData";
 
 // Initialize the stripe client
 const stripe = new Stripe(MainVariables.stripeSecretKey, {

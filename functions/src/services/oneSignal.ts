@@ -13,9 +13,6 @@ export interface INotificationObject {
     en: string;
     es?: string;
   };
-  web_push_topic?: string;
-  web_url?: string;
-  template_id?: string;
   data?: {
     [key: string]: string | number | boolean;
   };
@@ -26,16 +23,15 @@ export interface INotificationObject {
   android_channel_id?: string;
   existing_android_channel_id?: string;
   android_group?: string;
-  collapse_id?: string;
   thread_id?: string;
   summary_arg?: string;
+  large_icon?: string;
+  app_url?: string;
+  collapse_id?: string;
   android_group_message?: {
     en: string;
     es?: string;
   };
-  android_group_summary?: boolean;
-  large_icon?: string;
-  app_url?: string;
 }
 
 /**
