@@ -4,7 +4,7 @@ import {
 } from "@cuttinboard-solutions/types-helpers";
 import { auth, database, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
-import { differenceBy, isEqual } from "lodash";
+import { differenceBy, intersectionBy, isEqual } from "lodash";
 import {
   addEmployeesToPublicConversations,
   updateEmployeesFromPublicConversations,
@@ -18,19 +18,19 @@ export default async function updatedEmployees(
 ) {
   const newEmployees = differenceBy(afterEmployees, beforeEmployees, "id");
 
-  const updatedEmployees = afterEmployees.filter((afterEmployee) =>
-    beforeEmployees.some(
-      (beforeEmployee) => beforeEmployee.id === afterEmployee.id
-    )
-  );
-
-  const bUpdatedEmployees = beforeEmployees.filter((beforeEmployee) =>
-    afterEmployees.some(
-      (afterEmployee) => beforeEmployee.id === afterEmployee.id
-    )
-  );
-
   const oldEmployees = differenceBy(beforeEmployees, afterEmployees, "id");
+
+  const updatedEmployees = intersectionBy(
+    afterEmployees,
+    beforeEmployees,
+    "id"
+  );
+
+  const bUpdatedEmployees = intersectionBy(
+    beforeEmployees,
+    afterEmployees,
+    "id"
+  );
 
   const bulkWriter: firestore.BulkWriter = firestore().bulkWriter();
 

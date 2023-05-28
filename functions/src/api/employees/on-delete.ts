@@ -76,8 +76,9 @@ function deleteEmployeeFromEmployeesDocument(
       .doc(locationId)
       .collection("employees")
       .doc("employeesDocument"),
-    `employees.${employeeId}`,
-    firestore.FieldValue.delete()
+    {
+      [`employees.${employeeId}`]: firestore.FieldValue.delete(),
+    }
   );
 }
 

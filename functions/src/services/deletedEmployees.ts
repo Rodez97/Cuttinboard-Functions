@@ -128,17 +128,17 @@ export async function removeEmployeesFromAllConversations(
           dbUpdates[`users/${emp.id}/notifications/conv/${conversation.id}`] =
             null;
 
-          const firestoreUpdates: PartialWithFieldValue<IConversation> = {
-            members: {
-              [emp.id]: firestore.FieldValue.delete(),
-            },
-          };
+          const firestoreUpdates: PartialWithFieldValue<IConversation> = {};
+
+          firestoreUpdates[`members.${emp.id}`] = firestore.FieldValue.delete();
 
           if (guests && guests.includes(emp.id)) {
-            firestoreUpdates.guests = firestore.FieldValue.arrayRemove(emp.id);
+            firestoreUpdates["guests"] = firestore.FieldValue.arrayRemove(
+              emp.id
+            );
           }
 
-          bulkWriter.set(conversation.ref, firestoreUpdates, { merge: true });
+          bulkWriter.update(conversation.ref, firestoreUpdates);
         });
       }
     };
@@ -185,16 +185,10 @@ export async function removeEmployeesFromAllBoards(
 
         if (normalizedBoards.length > 0) {
           normalizedBoards.forEach((board) => {
-            bulkWriter.set(
-              board.ref,
-              {
-                details: {
-                  members: firestore.FieldValue.arrayRemove(emp.id),
-                  admins: firestore.FieldValue.arrayRemove(emp.id),
-                },
-              },
-              { merge: true }
-            );
+            bulkWriter.update(board.ref, {
+              [`details.members`]: firestore.FieldValue.arrayRemove(emp.id),
+              [`details.admins`]: firestore.FieldValue.arrayRemove(emp.id),
+            });
           });
         }
       };
@@ -216,9 +210,10 @@ export async function removeEmployeesMembershipToLocation(
 ) {
   try {
     const operations = employees.map(async (emp) => {
-      const fieldsOrPrecondition: PartialWithFieldValue<ICuttinboardUser> = {
-        locations: firestore.FieldValue.arrayRemove(locationId),
-      };
+      const fieldsOrPrecondition: PartialWithFieldValue<ICuttinboardUser> = {};
+
+      fieldsOrPrecondition["locations"] =
+        firestore.FieldValue.arrayRemove(locationId);
 
       const userDocumentRef = firestore()
         .collection("Users")
@@ -239,18 +234,16 @@ export async function removeEmployeesMembershipToLocation(
       ) {
         // If the employee doesn't have other locations in the same organization
         // Remove the organization from the employee's organizations array
-        fieldsOrPrecondition.organizations =
+        fieldsOrPrecondition["organizations"] =
           firestore.FieldValue.arrayRemove(organizationId);
-        fieldsOrPrecondition.organizationsRelationship = {
-          [organizationId]: firestore.FieldValue.delete(),
-        };
+        fieldsOrPrecondition[`organizationsRelationship.${organizationId}`] =
+          firestore.FieldValue.delete();
       } else {
-        fieldsOrPrecondition.organizationsRelationship = {
-          [organizationId]: firestore.FieldValue.arrayRemove(locationId),
-        };
+        fieldsOrPrecondition[`organizationsRelationship.${organizationId}`] =
+          firestore.FieldValue.arrayRemove(locationId);
       }
 
-      bulkWriter.set(userDocumentRef, fieldsOrPrecondition, { merge: true });
+      bulkWriter.update(userDocumentRef, fieldsOrPrecondition);
     });
 
     await Promise.all(operations);

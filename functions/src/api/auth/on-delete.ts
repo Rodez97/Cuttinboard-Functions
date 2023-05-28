@@ -147,11 +147,9 @@ const deleteEmployeeLocationProfiles = (
       .doc("employeesDocument")
       .withConverter(employeeDocConverter);
     // Delete the employee from the location's employees document
-    bulkWriter.update(
-      employeesDocRef,
-      `employees.${userId}`,
-      firestore.FieldValue.delete()
-    );
+    bulkWriter.update(employeesDocRef, {
+      [`employees.${userId}`]: firestore.FieldValue.delete(),
+    });
   });
 };
 
