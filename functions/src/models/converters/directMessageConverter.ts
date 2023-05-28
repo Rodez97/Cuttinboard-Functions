@@ -5,21 +5,27 @@ import {
 } from "@cuttinboard-solutions/types-helpers";
 import {
   DocumentData,
+  PartialWithFieldValue,
   QueryDocumentSnapshot,
-  WithFieldValue,
 } from "firebase-admin/firestore";
 
 export const directMessageConverter = {
-  toFirestore(object: IDirectMessage): DocumentData {
-    return object;
+  toFirestore(object: PartialWithFieldValue<IDirectMessage>): DocumentData {
+    const { id, ...objectToSave } = object;
+    return objectToSave;
   },
   fromFirestore(value: QueryDocumentSnapshot<IDirectMessage>): IDirectMessage {
-    return value.data();
+    const { id } = value;
+    const rawData = value.data();
+    return {
+      ...rawData,
+      id,
+    };
   },
 };
 
 export const conversationConverter = {
-  toFirestore(object: IConversation): DocumentData {
+  toFirestore(object: PartialWithFieldValue<IConversation>): DocumentData {
     return object;
   },
   fromFirestore(value: QueryDocumentSnapshot<IConversation>): IConversation {
@@ -28,7 +34,7 @@ export const conversationConverter = {
 };
 
 export const boardConverter = {
-  toFirestore(object: WithFieldValue<IBoard>): DocumentData {
+  toFirestore(object: PartialWithFieldValue<IBoard>): DocumentData {
     const { refPath, id, ...objectToSave } = object;
     return objectToSave;
   },

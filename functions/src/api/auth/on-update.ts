@@ -112,37 +112,29 @@ const updateEmployeeLocationProfiles = async (
         employeeDocSnap.get(`employees.${userId}.id`) === userId
       ) {
         // If the employee has a profile on the location, update it
-        bulkWriter.set(
-          employeesDocRef,
-          {
-            employees: {
-              [userId]: afterEmployeeData,
-            },
-          },
-          { merge: true }
-        );
+        bulkWriter.update(employeesDocRef, {
+          [`employees.${userId}`]: afterEmployeeData,
+        });
       } else {
         // If the employee does not have a profile on the location, remove the location from the employee's locations and the employee from the location's employees
-        bulkWriter.set(
+        bulkWriter.update(
           firestore()
             .collection("Users")
             .doc(userId)
             .withConverter(cuttinboardUserConverter),
           {
             locations: firestore.FieldValue.arrayRemove(locationId),
-          },
-          { merge: true }
+          }
         );
 
-        bulkWriter.set(
+        bulkWriter.update(
           firestore()
             .collection("Locations")
             .doc(locationId)
             .withConverter(locationConverter),
           {
             members: firestore.FieldValue.arrayRemove(userId),
-          },
-          { merge: true }
+          }
         );
       }
     });
@@ -198,19 +190,13 @@ const updateDMMember = async (
 
     // Update the employee's name and avatar on the DM chats
     directMessagesSnap.forEach((dmSnap) =>
-      bulkWriter.set(
-        dmSnap.ref,
-        {
-          members: {
-            [userId]: {
-              _id: userId,
-              name: fullName,
-              avatar: afterEmployeeData.avatar,
-            },
-          },
+      bulkWriter.update(dmSnap.ref, {
+        [`members.${userId}`]: {
+          _id: userId,
+          name: fullName,
+          avatar: afterEmployeeData.avatar,
         },
-        { merge: true }
-      )
+      })
     );
   } catch (error: any) {
     functions.logger.error(error);
@@ -237,21 +223,15 @@ const updateConversationMember = async (
     }
 
     // Update the employee's name and avatar on the conversations
-    conversations.forEach((conversation) =>
-      bulkWriter.set(
-        conversation.ref,
-        {
-          // Update the employee's name and avatar on the conversations
-          members: {
-            [userId]: {
-              name: fullName,
-              avatar: afterEmployeeData.avatar,
-            },
-          },
-        },
-        { merge: true }
-      )
-    );
+    conversations.forEach((conversation) => {
+      const reference = firestore()
+        .collection("conversations")
+        .doc(conversation.id);
+      bulkWriter.update(reference, {
+        [`members.${userId}.name`]: fullName,
+        [`members.${userId}.avatar`]: afterEmployeeData.avatar,
+      });
+    });
   } catch (error: any) {
     functions.logger.error(error);
   }

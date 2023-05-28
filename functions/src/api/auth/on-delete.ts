@@ -1,6 +1,5 @@
 import { firestore } from "firebase-admin";
 import { auth, logger } from "firebase-functions";
-import { directMessageConverter } from "../../models/converters/directMessageConverter";
 import { deleteFiles } from "../../services/deleteFiles";
 import { updateUserMetadata } from "../../services/updateUserMetadata";
 import Stripe from "stripe";
@@ -108,26 +107,20 @@ const deleteDMMember = async (
     const directMessageSnapshots = await firestore()
       .collection("directMessages")
       .where(`members.${userId}._id`, "==", userId)
-      .withConverter(directMessageConverter)
       .get();
 
     directMessageSnapshots.forEach((chatSnapshot) => {
       const { onlyOneMember } = chatSnapshot.data();
+      const dmRef = chatSnapshot.ref;
       if (onlyOneMember) {
         // If there is only one member in the direct message, delete it.
-        bulkWriter.delete(chatSnapshot.ref);
+        bulkWriter.delete(dmRef);
       } else {
         // Otherwise, remove the user from the direct message.
-        bulkWriter.set(
-          chatSnapshot.ref,
-          {
-            members: {
-              [userId]: firestore.FieldValue.delete(),
-            },
-            onlyOneMember: true,
-          },
-          { merge: true }
-        );
+        bulkWriter.update(dmRef, {
+          onlyOneMember: true,
+          [`members.${userId}`]: firestore.FieldValue.delete(),
+        });
       }
     });
   } catch (error: any) {
