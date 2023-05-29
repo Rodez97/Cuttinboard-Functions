@@ -11,7 +11,6 @@ import {
 } from "../../models/converters/employeeConverter";
 import { isEqual } from "lodash";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
 import { locationConverter } from "../../models/converters/locationConverter";
 
 /**
@@ -49,27 +48,12 @@ export default onDocumentUpdated(`/Users/{uid}`, async (event) => {
   const bulkWriter = firestore().bulkWriter();
 
   // Update the employee's profile on the locations
-  if (locations && locations.length > 0) {
-    await updateEmployeeLocationProfiles(
-      uid,
-      bulkWriter,
-      afterEmployeeData,
-      locations
-    );
-  }
+  await updateEmployeeLocationProfiles(uid, bulkWriter, afterEmployeeData);
 
   // Update the employee's profile on the organizations
-  if (organizations && organizations.length > 0) {
-    await updateEmployeeOrganizationsProfiles(
-      uid,
-      bulkWriter,
-      afterEmployeeData,
-      organizations
-    );
-  }
+  await updateEmployeeOrganizationsProfiles(uid, bulkWriter, afterEmployeeData);
 
-  const { name, lastName, avatar } =
-    event.data?.before.data() as ICuttinboardUser;
+  const { name, lastName, avatar } = bAfterEmployeeData;
 
   if (
     name !== afterEmployeeData.name ||
@@ -94,83 +78,59 @@ export default onDocumentUpdated(`/Users/{uid}`, async (event) => {
 const updateEmployeeLocationProfiles = async (
   userId: string,
   bulkWriter: firestore.BulkWriter,
-  afterEmployeeData: Partial<ICuttinboardUser>,
-  locations: string[]
+  afterEmployeeData: Partial<ICuttinboardUser>
 ) => {
-  try {
-    const operations = locations.map(async (locationId) => {
-      const employeesDocRef = firestore()
-        .collection("Locations")
-        .doc(locationId)
-        .collection("employees")
-        .doc("employeesDocument")
-        .withConverter(employeeDocConverter);
-      // Check if the employee has a profile on the location
-      const employeeDocSnap = await employeesDocRef.get();
-      if (
-        employeeDocSnap.exists &&
-        employeeDocSnap.get(`employees.${userId}.id`) === userId
-      ) {
-        // If the employee has a profile on the location, update it
-        bulkWriter.update(employeesDocRef, {
-          [`employees.${userId}`]: afterEmployeeData,
-        });
-      } else {
-        // If the employee does not have a profile on the location, remove the location from the employee's locations and the employee from the location's employees
-        bulkWriter.update(
-          firestore()
-            .collection("Users")
-            .doc(userId)
-            .withConverter(cuttinboardUserConverter),
-          {
-            locations: firestore.FieldValue.arrayRemove(locationId),
-          }
-        );
+  const query = firestore()
+    .collection("Locations")
+    .where("members", "array-contains", userId)
+    .withConverter(locationConverter);
 
-        bulkWriter.update(
-          firestore()
-            .collection("Locations")
-            .doc(locationId)
-            .withConverter(locationConverter),
-          {
-            members: firestore.FieldValue.arrayRemove(userId),
-          }
-        );
-      }
-    });
+  const locations = await query.get();
 
-    await Promise.all(operations);
-  } catch (error: any) {
-    functions.logger.error(error);
+  if (locations.empty) {
+    // If the user is not an employee of any location, return
+    return;
   }
+
+  locations.forEach((location) => {
+    const employeesDocRef = location.ref
+      .collection("employees")
+      .doc("employeesDocument")
+      .withConverter(employeeDocConverter);
+    // If the employee has a profile on the location, update it
+    bulkWriter.set(
+      employeesDocRef,
+      {
+        employees: {
+          [userId]: afterEmployeeData,
+        },
+      },
+      { merge: true }
+    );
+  });
 };
 
 const updateEmployeeOrganizationsProfiles = async (
   userId: string,
   bulkWriter: firestore.BulkWriter,
-  afterEmployeeData: Partial<ICuttinboardUser>,
-  organizations: string[]
+  afterEmployeeData: Partial<ICuttinboardUser>
 ) => {
-  try {
-    const operations = organizations.map(async (organizationId) => {
-      const employeesDocRef = firestore()
-        .collection("Organizations")
-        .doc(organizationId)
-        .collection("employees")
-        .doc(userId)
-        .withConverter(orgEmployeeConverter);
-      // Check if the employee has a profile on the organization
-      const employeeDocSnap = await employeesDocRef.get();
-      if (employeeDocSnap.exists) {
-        // If the employee has a profile on the organization, update it
-        bulkWriter.set(employeesDocRef, afterEmployeeData, { merge: true });
-      }
-    });
+  const query = firestore()
+    .collectionGroup("employees")
+    .where("id", "==", userId)
+    .withConverter(orgEmployeeConverter);
 
-    await Promise.all(operations);
-  } catch (error: any) {
-    functions.logger.error(error);
+  const organizationsEmployees = await query.get();
+
+  if (organizationsEmployees.empty) {
+    // If the user is not an employee of any organization, return
+    return;
   }
+
+  organizationsEmployees.forEach((organizationEmp) => {
+    // If the employee has a profile on the organization, update it
+    bulkWriter.set(organizationEmp.ref, afterEmployeeData, { merge: true });
+  });
 };
 
 const updateDMMember = async (

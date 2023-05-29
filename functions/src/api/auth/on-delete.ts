@@ -8,7 +8,7 @@ import {
   employeeDocConverter,
   orgEmployeeConverter,
 } from "../../models/converters/employeeConverter";
-import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
+import { locationConverter } from "../../models/converters/locationConverter";
 
 /**
  * When a user is deleted, delete their data from the locations and organizations
@@ -20,24 +20,14 @@ import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUse
  * - Update the metadata for the user's deleted state.
  */
 export default auth.user().onDelete(async (user) => {
-  // Get the user's profile from the database.
-  const userDoc = await firestore()
-    .collection("Users")
-    .doc(user.uid)
-    .withConverter(cuttinboardUserConverter)
-    .get();
-
-  // Get the user's profile data.
-  const userData = userDoc.data();
-
   // Initialize the update batch.
   const bulkWriter = firestore().bulkWriter();
 
   // Delete the user's profile from locations collection.
-  deleteEmployeeLocationProfiles(user.uid, bulkWriter, userData?.locations);
+  await deleteEmployeeLocationProfiles(user.uid, bulkWriter);
 
   // Delete the user's profile from organizations collection.
-  deleteEmployeeOrganizationsProfiles(user.uid, bulkWriter);
+  await deleteEmployeeOrganizationsProfiles(user.uid, bulkWriter);
 
   // Clean up the user's direct messages.
   await deleteDMMember(user.uid, bulkWriter);
@@ -129,49 +119,55 @@ const deleteDMMember = async (
   }
 };
 
-const deleteEmployeeLocationProfiles = (
+const deleteEmployeeLocationProfiles = async (
   userId: string,
-  bulkWriter: firestore.BulkWriter,
-  locations?: string[]
+  bulkWriter: firestore.BulkWriter
 ) => {
-  if (!locations || locations.length === 0) {
+  const query = firestore()
+    .collection("Locations")
+    .where("members", "array-contains", userId)
+    .withConverter(locationConverter);
+
+  const locations = await query.get();
+
+  if (locations.empty) {
     // If the user is not an employee of any location, return
     return;
   }
 
-  locations.forEach((locationId) => {
-    const employeesDocRef = firestore()
-      .collection("Locations")
-      .doc(locationId)
+  locations.forEach((location) => {
+    const employeesDocRef = location.ref
       .collection("employees")
       .doc("employeesDocument")
       .withConverter(employeeDocConverter);
     // Delete the employee from the location's employees document
-    bulkWriter.update(employeesDocRef, {
-      [`employees.${userId}`]: firestore.FieldValue.delete(),
-    });
+    bulkWriter.update(
+      employeesDocRef,
+      `employees.${userId}`,
+      firestore.FieldValue.delete()
+    );
   });
 };
 
-const deleteEmployeeOrganizationsProfiles = (
+const deleteEmployeeOrganizationsProfiles = async (
   userId: string,
-  bulkWriter: firestore.BulkWriter,
-  organizations?: string[]
+  bulkWriter: firestore.BulkWriter
 ) => {
-  if (!organizations || organizations.length === 0) {
+  const query = firestore()
+    .collectionGroup("employees")
+    .where("id", "==", userId)
+    .withConverter(orgEmployeeConverter);
+
+  const organizationsEmployees = await query.get();
+
+  if (organizationsEmployees.empty) {
     // If the user is not an employee of any organization, return
     return;
   }
 
-  organizations.forEach((organizationId) => {
-    const organizationDocRef = firestore()
-      .collection("Organizations")
-      .doc(organizationId)
-      .collection("employees")
-      .doc(userId)
-      .withConverter(orgEmployeeConverter);
+  organizationsEmployees.forEach((organizationEmp) => {
     // Delete the employee from the organization's employees collection
-    bulkWriter.delete(organizationDocRef);
+    bulkWriter.delete(organizationEmp.ref);
   });
 };
 

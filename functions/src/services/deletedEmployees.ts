@@ -1,6 +1,5 @@
 import {
   IConversation,
-  ICuttinboardUser,
   IEmployee,
   RoleAccessLevels,
 } from "@cuttinboard-solutions/types-helpers";
@@ -14,7 +13,6 @@ import {
 } from "../models/converters/directMessageConverter";
 import { PartialWithFieldValue } from "firebase-admin/firestore";
 import { uniqBy } from "lodash";
-import { cuttinboardUserConverter } from "../models/converters/cuttinboardUserConverter";
 
 export default async function deleteEmployees(
   locationId: string,
@@ -23,8 +21,6 @@ export default async function deleteEmployees(
   bulkWriter?: firestore.BulkWriter
 ) {
   const employeesIds = employees.map((employee) => employee.id);
-
-  const organizationId = employees[0].organizationId;
 
   const locationLevelEmployees = employees.filter(
     (employee) => employee.role > RoleAccessLevels.ADMIN
@@ -47,14 +43,6 @@ export default async function deleteEmployees(
     // Remove the employee from all conversations in the location
     await removeEmployeesFromAllConversations(
       locationId,
-      employees,
-      innerBulkWriter
-    );
-
-    // Remove employees membership from the location
-    await removeEmployeesMembershipToLocation(
-      locationId,
-      organizationId,
       employees,
       innerBulkWriter
     );
@@ -198,56 +186,6 @@ export async function removeEmployeesFromAllBoards(
 
     await Promise.all(operations);
   } catch (error: any) {
-    functions.logger.error(error);
-  }
-}
-
-export async function removeEmployeesMembershipToLocation(
-  locationId: string,
-  organizationId: string,
-  employees: IEmployee[],
-  bulkWriter: firestore.BulkWriter
-) {
-  try {
-    const operations = employees.map(async (emp) => {
-      const fieldsOrPrecondition: PartialWithFieldValue<ICuttinboardUser> = {};
-
-      fieldsOrPrecondition["locations"] =
-        firestore.FieldValue.arrayRemove(locationId);
-
-      const userDocumentRef = firestore()
-        .collection("Users")
-        .doc(emp.id)
-        .withConverter(cuttinboardUserConverter);
-
-      const userData = (await userDocumentRef.get()).data();
-
-      // Check if the employee has other locations in the same organization
-      const otherLocationsInOrganization =
-        userData?.organizationsRelationship?.[organizationId]?.filter(
-          (loc) => loc !== locationId
-        );
-
-      if (
-        !otherLocationsInOrganization ||
-        otherLocationsInOrganization.length === 0
-      ) {
-        // If the employee doesn't have other locations in the same organization
-        // Remove the organization from the employee's organizations array
-        fieldsOrPrecondition["organizations"] =
-          firestore.FieldValue.arrayRemove(organizationId);
-        fieldsOrPrecondition[`organizationsRelationship.${organizationId}`] =
-          firestore.FieldValue.delete();
-      } else {
-        fieldsOrPrecondition[`organizationsRelationship.${organizationId}`] =
-          firestore.FieldValue.arrayRemove(locationId);
-      }
-
-      bulkWriter.update(userDocumentRef, fieldsOrPrecondition);
-    });
-
-    await Promise.all(operations);
-  } catch (error) {
     functions.logger.error(error);
   }
 }

@@ -84,9 +84,7 @@ export default onCall<ICreateLocationData>(
     const batch = firestore().batch();
 
     try {
-      const userUpdates: PartialWithFieldValue<ICuttinboardUser> = {
-        organizations: firestore.FieldValue.arrayUnion(uid),
-      };
+      const userUpdates: PartialWithFieldValue<ICuttinboardUser> = {};
 
       if (!customerId) {
         // If the user does not have a customer ID then create one

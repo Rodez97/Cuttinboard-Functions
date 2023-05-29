@@ -5,7 +5,6 @@ import {
 import { firestore } from "firebase-admin";
 import { orgEmployeeConverter } from "../../../models/converters/employeeConverter";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
 import { logger } from "firebase-functions/v1";
 import { locationConverter } from "../../../models/converters/locationConverter";
 
@@ -122,22 +121,6 @@ export default onCall<string>(async (request) => {
       firestore().collection("Locations").doc(locationId),
       "members",
       firestore.FieldValue.arrayUnion(auth.uid)
-    );
-
-    // Add the location to the employee's locations array
-    bulkWriter.set(
-      firestore()
-        .collection("Users")
-        .doc(auth.uid)
-        .withConverter(cuttinboardUserConverter),
-      {
-        locations: firestore.FieldValue.arrayUnion(locationId),
-        organizations: firestore.FieldValue.arrayUnion(orgId),
-        organizationsRelationship: {
-          [orgId]: firestore.FieldValue.arrayUnion(locationId),
-        },
-      },
-      { merge: true }
     );
 
     // Commit the batch

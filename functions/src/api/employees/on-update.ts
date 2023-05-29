@@ -6,7 +6,6 @@ import { auth, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { difference, isEqual } from "lodash";
 import { updateUserMetadata } from "../../services/updateUserMetadata";
-import { employeeDocConverter } from "../../models/converters/employeeConverter";
 
 export default functions.firestore
   .document("/Organizations/{orgId}/employees/{employeeId}")
@@ -52,8 +51,7 @@ export default functions.firestore
           .collection("Locations")
           .doc(locationId)
           .collection("employees")
-          .doc("employeesDocument")
-          .withConverter(employeeDocConverter),
+          .doc("employeesDocument"),
         `employees.${employeeId}`,
         firestore.FieldValue.delete()
       );

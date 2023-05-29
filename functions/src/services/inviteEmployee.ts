@@ -55,10 +55,6 @@ async function createNewUserAndEmployee({
       name,
       lastName,
       email,
-      organizations: [organizationId],
-      organizationsRelationship: {
-        [organizationId]: firestore.FieldValue.arrayUnion(locationId),
-      },
     },
     { merge: true }
   );
@@ -159,15 +155,6 @@ async function createNewEmployee(
     { employees: { [newEmployeeToAdd.id]: newEmployeeToAdd } },
     { merge: true }
   );
-
-  // add organization and location to user
-  batch.update(userDocumentRef, {
-    organizations: firestore.FieldValue.arrayUnion(organizationId),
-    locations: firestore.FieldValue.arrayUnion(locationId),
-    organizationsRelationship: {
-      [organizationId]: firestore.FieldValue.arrayUnion(locationId),
-    },
-  });
 
   // Add the employee ID to the members array in the location document
   batch.update(firestore().collection("Locations").doc(locationId), {

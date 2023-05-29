@@ -2,7 +2,6 @@ import { IOrganizationEmployee } from "@cuttinboard-solutions/types-helpers";
 import { firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { clearUserClaims } from "../../services/auth";
-import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
 
 export default functions.firestore
   .document("/Organizations/{organizationId}/employees/{employeeId}")
@@ -11,11 +10,9 @@ export default functions.firestore
     const { supervisingLocations } = snapshot.data() as IOrganizationEmployee;
 
     try {
-      await updateLocationsAndEmployees(
-        employeeId,
-        organizationId,
-        supervisingLocations
-      );
+      if (supervisingLocations && supervisingLocations.length > 0) {
+        await updateLocationsAndEmployees(employeeId, supervisingLocations);
+      }
       await deleteSupervisorDocuments(organizationId, employeeId);
       await clearUserClaims([employeeId], organizationId);
     } catch (error: any) {
@@ -26,60 +23,29 @@ export default functions.firestore
 
 async function updateLocationsAndEmployees(
   employeeId: string,
-  organizationId: string,
-  supervisingLocations?: string[]
+  supervisingLocations: string[]
 ) {
   const bulkWriter = firestore().bulkWriter();
 
-  // Remove the organization from the user's organization list.
-  bulkWriter.update(
-    firestore()
-      .collection("Users")
-      .doc(employeeId)
-      .withConverter(cuttinboardUserConverter),
-    {
-      organizations: firestore.FieldValue.arrayRemove(organizationId),
-      [`organizationsRelationship.${organizationId}`]:
-        firestore.FieldValue.delete(),
-    }
-  );
-
-  if (supervisingLocations && supervisingLocations.length > 0) {
-    for (const locationId of supervisingLocations) {
-      removeEmployeeFromLocation(bulkWriter, locationId, employeeId);
-      deleteEmployeeFromEmployeesDocument(bulkWriter, locationId, employeeId);
-    }
-  }
+  supervisingLocations.forEach((locationId) => {
+    // Remove the employee from the location members and supervisors arrays
+    bulkWriter.update(firestore().collection("Locations").doc(locationId), {
+      members: firestore.FieldValue.arrayRemove(employeeId),
+      supervisors: firestore.FieldValue.arrayRemove(employeeId),
+    });
+    // Remove the employee from the location employeesDocument
+    bulkWriter.update(
+      firestore()
+        .collection("Locations")
+        .doc(locationId)
+        .collection("employees")
+        .doc("employeesDocument"),
+      `employees.${employeeId}`,
+      firestore.FieldValue.delete()
+    );
+  });
 
   await bulkWriter.close();
-}
-
-function removeEmployeeFromLocation(
-  bulkWriter: firestore.BulkWriter,
-  locationId: string,
-  employeeId: string
-) {
-  bulkWriter.update(firestore().collection("Locations").doc(locationId), {
-    members: firestore.FieldValue.arrayRemove(employeeId),
-    supervisors: firestore.FieldValue.arrayRemove(employeeId),
-  });
-}
-
-function deleteEmployeeFromEmployeesDocument(
-  bulkWriter: firestore.BulkWriter,
-  locationId: string,
-  employeeId: string
-) {
-  bulkWriter.update(
-    firestore()
-      .collection("Locations")
-      .doc(locationId)
-      .collection("employees")
-      .doc("employeesDocument"),
-    {
-      [`employees.${employeeId}`]: firestore.FieldValue.delete(),
-    }
-  );
 }
 
 const deleteSupervisorDocuments = async (
