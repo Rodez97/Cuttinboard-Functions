@@ -95,12 +95,11 @@ export async function updateEmployeesFromPublicConversations(
         const documentUpdates: PartialWithFieldValue<IConversation> = {};
 
         for (const employee of employees) {
-          if (guests && guests.includes(employee.id)) {
-            // The employee is a guest in this conversation
-            continue;
-          }
+          const isGuest = Boolean(guests?.includes(employee.id));
+          const isMember = Boolean(members[employee.id]);
+          const hasPosition = Boolean(employee.positions?.includes(position));
 
-          if (employee.positions?.includes(position) && !members[employee.id]) {
+          if (hasPosition && !isMember) {
             // The employee matches the position and is not a member of the conversation
             // Add the employee to the conversation
             documentUpdates[`members.${employee.id}`] = {
@@ -108,10 +107,13 @@ export async function updateEmployeesFromPublicConversations(
               avatar: employee.avatar,
               muted: false,
             };
-          } else if (
-            !employee.positions?.includes(position) &&
-            members[employee.id]
-          ) {
+          }
+          if (hasPosition && isGuest) {
+            documentUpdates[`guests`] = firestore.FieldValue.arrayRemove(
+              employee.id
+            );
+          }
+          if (!hasPosition && isMember && !isGuest) {
             // The employee does not match the position and is a member of the conversation
             // Remove the employee from the conversation
             documentUpdates[`members.${employee.id}`] =
