@@ -11,4 +11,5 @@ export interface ICreateLocationData {
     lastName: string;
     email: string;
   };
+  promo?: string | undefined;
 }
