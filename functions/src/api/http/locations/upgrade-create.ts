@@ -121,7 +121,7 @@ export default onCall<ICreateLocationData>(
         },
         trial_period_days: 30,
         expand: ["items.data.price.product"],
-        coupon: data.promo,
+        promotion_code: data.promo,
       });
 
       if (!subscription) {
