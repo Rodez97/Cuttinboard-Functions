@@ -112,6 +112,26 @@ export default onCall<ICreateLocationData>(
         userUpdates.customerId = customerId;
       }
 
+      let promotion_code: string | undefined;
+
+      if (data.promo) {
+        // If the user has a promo code then get the promo code
+        const promo = await stripe.promotionCodes.list({
+          code: data.promo,
+          limit: 1,
+        });
+
+        if (promo.data.length > 0) {
+          promotion_code = promo.data[0].id;
+        } else {
+          // If the promo code does not exist then throw an error
+          throw new HttpsError(
+            "not-found",
+            "The promo code does not exist or has expired!"
+          );
+        }
+      }
+
       // Create the subscription
       const subscription = await stripe.subscriptions.create({
         customer: userUpdates.customerId,
@@ -121,7 +141,7 @@ export default onCall<ICreateLocationData>(
         },
         trial_period_days: 30,
         expand: ["items.data.price.product"],
-        promotion_code: data.promo,
+        promotion_code,
       });
 
       if (!subscription) {

@@ -192,7 +192,7 @@ export const manageSubscriptionStatusChange = async (
 ): Promise<void> => {
   // Retrieve latest subscription status and write it to the Firestore
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-    expand: ["default_payment_method", "items.data.price.product"],
+    expand: ["default_payment_method", "items.data.price.product", "discount"],
   });
   const bulkWriter = firestore().bulkWriter();
   const { price, quantity } = subscription.items.data[0];
@@ -229,6 +229,7 @@ export const manageSubscriptionStatusChange = async (
     latest_invoice: subscription.latest_invoice as string,
     metadata: { owner: organizationId, customer: customerId },
     default_payment_method: subscription.default_payment_method,
+    discount: subscription.discount,
   };
 
   bulkWriter.set(

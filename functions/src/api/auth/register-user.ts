@@ -1,6 +1,6 @@
 import { auth, firestore } from "firebase-admin";
-import { isFirebaseError } from "../../services/errorCheck";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v1";
 
 interface RegisterUserRequest {
   email: string;
@@ -47,11 +47,8 @@ export default onCall<RegisterUserRequest>(
       // Return the user data.
       return cuttinboardUser.uid;
     } catch (error: any) {
-      if (isFirebaseError(error)) {
-        throw new HttpsError("failed-precondition", error.code);
-      } else {
-        throw new HttpsError("unknown", error?.message);
-      }
+      logger.error(error);
+      throw new HttpsError("failed-precondition", error.message);
     }
   }
 );

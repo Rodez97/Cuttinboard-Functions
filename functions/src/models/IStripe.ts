@@ -141,6 +141,7 @@ export interface Subscription {
   pending_update?: boolean;
   latest_invoice?: string;
   default_payment_method: string | Stripe.PaymentMethod | null;
+  discount: Stripe.Discount | null;
 }
 
 export interface TaxRate extends Stripe.TaxRate {
