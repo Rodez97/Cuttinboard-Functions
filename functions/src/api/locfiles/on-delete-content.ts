@@ -1,4 +1,4 @@
-import { ICuttinboard_File } from "@cuttinboard-solutions/types-helpers";
+import { ICuttinboard_File } from "@rodez97/types-helpers";
 import { storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 

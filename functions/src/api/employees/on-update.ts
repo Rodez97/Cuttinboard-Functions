@@ -1,7 +1,7 @@
 import {
   IOrganizationEmployee,
   IOrganizationKey,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { auth, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { difference, isEqual } from "lodash";

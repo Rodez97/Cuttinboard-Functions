@@ -1,7 +1,4 @@
-import {
-  IOrganizationKey,
-  RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+import { IOrganizationKey, RoleAccessLevels } from "@rodez97/types-helpers";
 import axios from "axios";
 import { auth, database } from "firebase-admin";
 import { isEqual } from "lodash";

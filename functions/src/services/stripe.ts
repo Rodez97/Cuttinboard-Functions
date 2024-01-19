@@ -1,7 +1,4 @@
-import {
-  ILocation,
-  LocationSubscriptionStatus,
-} from "@cuttinboard-solutions/types-helpers";
+import { ILocation, LocationSubscriptionStatus } from "@rodez97/types-helpers";
 import { firestore } from "firebase-admin";
 import { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { uniq } from "lodash";

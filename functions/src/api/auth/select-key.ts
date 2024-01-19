@@ -1,7 +1,4 @@
-import {
-  IOrganizationKey,
-  RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+import { IOrganizationKey, RoleAccessLevels } from "@rodez97/types-helpers";
 import { auth, firestore } from "firebase-admin";
 import { employeeDocConverter } from "../../models/converters/employeeConverter";
 import { updateUserMetadata } from "../../services/updateUserMetadata";

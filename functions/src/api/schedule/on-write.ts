@@ -1,4 +1,4 @@
-import { IScheduleDoc, WeekInfo } from "@cuttinboard-solutions/types-helpers";
+import { IScheduleDoc, WeekInfo } from "@rodez97/types-helpers";
 import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
 import customParseFormat from "dayjs/plugin/customParseFormat";

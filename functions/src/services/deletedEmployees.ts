@@ -2,7 +2,7 @@ import {
   IConversation,
   IEmployee,
   RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { database, firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { BOARDS } from "../config";

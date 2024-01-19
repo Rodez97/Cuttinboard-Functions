@@ -1,4 +1,4 @@
-import { IDirectMessage } from "@cuttinboard-solutions/types-helpers";
+import { IDirectMessage } from "@rodez97/types-helpers";
 import { database, firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 

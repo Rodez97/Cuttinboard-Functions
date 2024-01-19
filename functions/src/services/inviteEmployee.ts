@@ -4,7 +4,7 @@ import { EmployeeData } from "../api/http/employees/create";
 import { checkIfUserExistsByEmail } from "./auth";
 import { sendWelcomeEmail } from "./emails";
 import { handleError } from "./handleError";
-import { IEmployee } from "@cuttinboard-solutions/types-helpers";
+import { IEmployee } from "@rodez97/types-helpers";
 import { cuttinboardUserConverter } from "../models/converters/cuttinboardUserConverter";
 import { locationConverter } from "../models/converters/locationConverter";
 import { employeeDocConverter } from "../models/converters/employeeConverter";

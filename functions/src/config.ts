@@ -1,4 +1,4 @@
-import { ILocationLimits } from "@cuttinboard-solutions/types-helpers";
+import { ILocationLimits } from "@rodez97/types-helpers";
 import { ServiceAccount } from "firebase-admin";
 
 export const MainVariables = {

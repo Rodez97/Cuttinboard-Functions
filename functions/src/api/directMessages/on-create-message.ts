@@ -1,4 +1,4 @@
-import { IMessage } from "@cuttinboard-solutions/types-helpers";
+import { IMessage } from "@rodez97/types-helpers";
 import { database, firestore } from "firebase-admin";
 import { MainVariables } from "../../config";
 import { directMessageConverter } from "../../models/converters/directMessageConverter";

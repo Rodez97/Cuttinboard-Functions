@@ -3,7 +3,7 @@ import {
   IEmployee,
   PrivacyLevel,
   getEmployeeFullName,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { firestore } from "firebase-admin";
 import { conversationConverter } from "../models/converters/directMessageConverter";
 import { logger } from "firebase-functions";

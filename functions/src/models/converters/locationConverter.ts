@@ -1,7 +1,11 @@
-import { ILocation } from "@cuttinboard-solutions/types-helpers";
-import { DocumentData, QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { ILocation } from "@rodez97/types-helpers";
+import {
+  DocumentData,
+  FirestoreDataConverter,
+  QueryDocumentSnapshot,
+} from "firebase-admin/firestore";
 
-export const locationConverter = {
+export const locationConverter: FirestoreDataConverter<ILocation> = {
   toFirestore(object: ILocation): DocumentData {
     const { refPath, id, ...objectToSave } = object;
     return objectToSave;

@@ -2,7 +2,7 @@ import { firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { deleteFiles } from "../../services/deleteFiles";
 import { GrpcStatus } from "firebase-admin/firestore";
-import { ILocation } from "@cuttinboard-solutions/types-helpers";
+import { ILocation } from "@rodez97/types-helpers";
 import { conversationConverter } from "../../models/converters/directMessageConverter";
 import { orgEmployeeConverter } from "../../models/converters/employeeConverter";
 import { clearUserClaimsLocation } from "../../services/auth";

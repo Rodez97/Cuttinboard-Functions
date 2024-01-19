@@ -1,15 +1,12 @@
-import {
-  IBoard,
-  IConversation,
-  IDirectMessage,
-} from "@cuttinboard-solutions/types-helpers";
+import { IBoard, IConversation, IDirectMessage } from "@rodez97/types-helpers";
 import {
   DocumentData,
+  FirestoreDataConverter,
   PartialWithFieldValue,
   QueryDocumentSnapshot,
 } from "firebase-admin/firestore";
 
-export const directMessageConverter = {
+export const directMessageConverter: FirestoreDataConverter<IDirectMessage> = {
   toFirestore(object: PartialWithFieldValue<IDirectMessage>): DocumentData {
     const { id, ...objectToSave } = object;
     return objectToSave;
@@ -24,7 +21,7 @@ export const directMessageConverter = {
   },
 };
 
-export const conversationConverter = {
+export const conversationConverter: FirestoreDataConverter<IConversation> = {
   toFirestore(object: PartialWithFieldValue<IConversation>): DocumentData {
     return object;
   },
@@ -33,7 +30,7 @@ export const conversationConverter = {
   },
 };
 
-export const boardConverter = {
+export const boardConverter: FirestoreDataConverter<IBoard> = {
   toFirestore(object: PartialWithFieldValue<IBoard>): DocumentData {
     const { refPath, id, ...objectToSave } = object;
     return objectToSave;

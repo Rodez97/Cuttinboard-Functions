@@ -2,7 +2,7 @@ import {
   ICuttinboardUser,
   IOrganizationEmployee,
   RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { firestore } from "firebase-admin";
 import Stripe from "stripe";
 import { MainVariables } from "../../config";

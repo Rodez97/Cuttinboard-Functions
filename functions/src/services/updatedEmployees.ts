@@ -1,7 +1,4 @@
-import {
-  IEmployee,
-  IOrganizationKey,
-} from "@cuttinboard-solutions/types-helpers";
+import { IEmployee, IOrganizationKey } from "@rodez97/types-helpers";
 import { auth, database, firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { differenceBy, intersectionBy, isEqual } from "lodash";

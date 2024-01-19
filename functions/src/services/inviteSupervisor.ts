@@ -1,7 +1,7 @@
 import {
   IOrganizationEmployee,
   RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { auth, firestore } from "firebase-admin";
 import { https, logger } from "firebase-functions";
 import { cuttinboardUserConverter } from "../models/converters/cuttinboardUserConverter";

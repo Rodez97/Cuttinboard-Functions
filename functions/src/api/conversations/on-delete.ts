@@ -1,4 +1,4 @@
-import { IConversation } from "@cuttinboard-solutions/types-helpers";
+import { IConversation } from "@rodez97/types-helpers";
 import { database, firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 

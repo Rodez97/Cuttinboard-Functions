@@ -1,4 +1,4 @@
-import { IMessage } from "@cuttinboard-solutions/types-helpers";
+import { IMessage } from "@rodez97/types-helpers";
 import { storage } from "firebase-admin";
 import { parseStoragePathFromUrl } from "../../services/helpers";
 import * as functions from "firebase-functions";

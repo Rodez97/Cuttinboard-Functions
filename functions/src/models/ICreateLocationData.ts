@@ -1,4 +1,4 @@
-import { ILocationAddress } from "@cuttinboard-solutions/types-helpers";
+import { ILocationAddress } from "@rodez97/types-helpers";
 
 export interface ICreateLocationData {
   location: {

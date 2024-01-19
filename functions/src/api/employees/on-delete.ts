@@ -1,4 +1,4 @@
-import { IOrganizationEmployee } from "@cuttinboard-solutions/types-helpers";
+import { IOrganizationEmployee } from "@rodez97/types-helpers";
 import { firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { clearUserClaims } from "../../services/auth";

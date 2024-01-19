@@ -1,4 +1,4 @@
-import { Organization } from "@cuttinboard-solutions/types-helpers";
+import { Organization } from "@rodez97/types-helpers";
 import {
   FirestoreDataConverter,
   PartialWithFieldValue,

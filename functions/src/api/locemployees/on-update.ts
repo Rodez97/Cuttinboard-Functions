@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { IEmployeesDocument } from "@cuttinboard-solutions/types-helpers";
+import { IEmployeesDocument } from "@rodez97/types-helpers";
 import updatedEmployees from "../../services/updatedEmployees";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import deleteEmployees from "../../services/deletedEmployees";

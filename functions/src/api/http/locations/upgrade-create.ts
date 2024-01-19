@@ -11,7 +11,7 @@ import {
   ILocationLimits,
   IOrganizationEmployee,
   RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { PartialWithFieldValue } from "firebase-admin/firestore";
 import { organizationConverter } from "../../../models/converters/organizationConverter";
@@ -21,7 +21,7 @@ import { logger } from "firebase-functions";
 
 // Initialize Stripe
 const stripe = new Stripe(MainVariables.stripeSecretKey, {
-  apiVersion: "2020-08-27",
+  apiVersion: "2023-10-16",
   // Register extension as a Stripe plugin
   // https://stripe.com/docs/building-plugins#setappinfo
   appInfo: {
@@ -166,7 +166,7 @@ export default onCall<ICreateLocationData>(
       // Create the location data
       const locationMain: ILocation = {
         ...location,
-        subscriptionStatus: subscription.status,
+        subscriptionStatus: subscription.status as any,
         storageUsed: 0,
         limits: metadata as unknown as ILocationLimits,
         organizationId: uid,
@@ -219,7 +219,7 @@ export default onCall<ICreateLocationData>(
           subscriptionId: userUpdates.subscriptionId,
           locations: 1,
           subItemId: subscription.items.data[0].id,
-          subscriptionStatus: subscription.status,
+          subscriptionStatus: subscription.status as any,
           limits: {
             storage: "5e+9",
           },

@@ -8,7 +8,7 @@ import {
   ILocation,
   ILocationLimits,
   RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -18,7 +18,7 @@ import { ICreateLocationData } from "../../../models/ICreateLocationData";
 
 // Initialize the stripe client
 const stripe = new Stripe(MainVariables.stripeSecretKey, {
-  apiVersion: "2020-08-27",
+  apiVersion: "2023-10-16",
   // Register extension as a Stripe plugin
   // https://stripe.com/docs/building-plugins#setappinfo
   appInfo: {
@@ -100,7 +100,7 @@ export default onCall<ICreateLocationData>(
       // Create the location data
       const locationMain: ILocation = {
         ...location,
-        subscriptionStatus: subscription.status,
+        subscriptionStatus: subscription.status as any,
         storageUsed: 0,
         limits: metadata as unknown as ILocationLimits,
         organizationId: uid,

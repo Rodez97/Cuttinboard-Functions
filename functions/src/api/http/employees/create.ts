@@ -2,7 +2,7 @@ import {
   IOrganizationKey,
   ManagerPermissions,
   RoleAccessLevels,
-} from "@cuttinboard-solutions/types-helpers";
+} from "@rodez97/types-helpers";
 import { inviteEmployee } from "../../../services/inviteEmployee";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
