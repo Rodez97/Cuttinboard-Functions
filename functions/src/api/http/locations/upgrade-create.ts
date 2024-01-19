@@ -1,6 +1,5 @@
 import { firestore } from "firebase-admin";
 import Stripe from "stripe";
-import { MainVariables } from "../../../config";
 import short from "short-uuid";
 import { inviteEmployee } from "../../../services/inviteEmployee";
 import { cuttinboardUserConverter } from "../../../models/converters/cuttinboardUserConverter";
@@ -20,7 +19,7 @@ import { GeneralManagerSchema } from "../../../services/validationSchemes";
 import { logger } from "firebase-functions";
 
 // Initialize Stripe
-const stripe = new Stripe(MainVariables.stripeSecretKey, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2023-10-16",
   // Register extension as a Stripe plugin
   // https://stripe.com/docs/building-plugins#setappinfo
@@ -135,7 +134,7 @@ export default onCall<ICreateLocationData>(
       // Create the subscription
       const subscription = await stripe.subscriptions.create({
         customer: userUpdates.customerId,
-        items: [{ price: MainVariables.stripePriceId, quantity: 1 }],
+        items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
         metadata: {
           firebaseUID: uid,
         },

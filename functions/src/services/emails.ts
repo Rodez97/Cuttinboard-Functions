@@ -3,7 +3,6 @@ import {
   TransactionalEmailsApi,
   TransactionalEmailsApiApiKeys,
 } from "@sendinblue/client";
-import { MainVariables } from "../config";
 
 // This will be used to send emails
 const apiInstance = new TransactionalEmailsApi();
@@ -11,7 +10,7 @@ const apiInstance = new TransactionalEmailsApi();
 // This is the API key used to send emails
 apiInstance.setApiKey(
   TransactionalEmailsApiApiKeys.apiKey,
-  MainVariables.transactionalEmailsApiApiKey
+  process.env.TRANSACTIONAL_EMAILS_API_KEY
 );
 
 /**

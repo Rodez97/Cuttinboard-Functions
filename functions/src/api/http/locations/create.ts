@@ -1,7 +1,6 @@
 import { firestore } from "firebase-admin";
 import short from "short-uuid";
 import Stripe from "stripe";
-import { MainVariables } from "../../../config";
 import { inviteEmployee } from "../../../services/inviteEmployee";
 import {
   DefaultScheduleSettings,
@@ -17,7 +16,7 @@ import { GeneralManagerSchema } from "../../../services/validationSchemes";
 import { ICreateLocationData } from "../../../models/ICreateLocationData";
 
 // Initialize the stripe client
-const stripe = new Stripe(MainVariables.stripeSecretKey, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2023-10-16",
   // Register extension as a Stripe plugin
   // https://stripe.com/docs/building-plugins#setappinfo

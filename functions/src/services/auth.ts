@@ -2,7 +2,6 @@ import { IOrganizationKey, RoleAccessLevels } from "@rodez97/types-helpers";
 import axios from "axios";
 import { auth, database } from "firebase-admin";
 import { isEqual } from "lodash";
-import { MainVariables } from "../config";
 import { updateUserMetadata } from "./updateUserMetadata";
 import { logger } from "firebase-functions";
 
@@ -137,7 +136,7 @@ export async function checkPassword(email: string, password: string) {
   try {
     // Get the user's data
     const response = await axios.post(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${MainVariables.apiKey}`,
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.API_KEY}`,
       { email, password, returnSecureToken: true }
     );
     if (response.status !== 200) {

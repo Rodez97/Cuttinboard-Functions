@@ -1,11 +1,10 @@
 import { Organization } from "@rodez97/types-helpers";
 import Stripe from "stripe";
-import { MainVariables } from "../../config";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { logger, auth } from "firebase-functions";
 
 // Initialize Stripe
-const stripe = new Stripe(MainVariables.stripeSecretKey, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2023-10-16",
   // Register extension as a Stripe plugin
   // https://stripe.com/docs/building-plugins#setappinfo

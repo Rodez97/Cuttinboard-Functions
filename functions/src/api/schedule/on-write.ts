@@ -14,7 +14,6 @@ import {
   INotificationObject,
   sendNotificationToUids,
 } from "../../services/oneSignal";
-import { MainVariables } from "../../config";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 dayjs.extend(isoWeek);
 dayjs.extend(advancedFormat);
@@ -99,7 +98,7 @@ export default onDocumentWritten("/schedule/{scheduleId}", async (event) => {
 
     const notification: INotificationObject = {
       include_external_user_ids: notificationRecipients,
-      app_id: MainVariables.oneSignalAppId,
+      app_id: process.env.ONE_SIGNAL_APP_ID,
       contents: {
         en: englishMessage,
         es: spanishMessage,
@@ -108,7 +107,7 @@ export default onDocumentWritten("/schedule/{scheduleId}", async (event) => {
         en: `📅 Schedule updated`,
         es: `📅 Horario actualizado`,
       },
-      android_channel_id: MainVariables.scheduleChannelId,
+      android_channel_id: process.env.SCHEDULE_CHANNEL_ID,
       android_group: "schedule",
       thread_id: "schedule",
       summary_arg: "Cuttinboard",

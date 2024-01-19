@@ -1,6 +1,5 @@
 import { IMessage } from "@rodez97/types-helpers";
 import { database, firestore } from "firebase-admin";
-import { MainVariables } from "../../config";
 import { directMessageConverter } from "../../models/converters/directMessageConverter";
 import {
   INotificationObject,
@@ -85,7 +84,7 @@ export default functions.firestore
 
       const notification: INotificationObject = {
         include_external_user_ids: [recipient],
-        app_id: MainVariables.oneSignalAppId,
+        app_id: process.env.ONE_SIGNAL_APP_ID,
         contents: {
           en: text ? text : image ? "📷 New image" : "New message",
         },
@@ -93,7 +92,7 @@ export default functions.firestore
           en: `💬 New message from ${senderName}`,
           es: `💬 Nuevo mensaje de ${senderName}`,
         },
-        android_channel_id: MainVariables.directMessagesChannelId,
+        android_channel_id: process.env.DIRECT_MESSAGES_CHANNEL_ID,
         android_group: chatId,
         thread_id: chatId,
         summary_arg: senderName,

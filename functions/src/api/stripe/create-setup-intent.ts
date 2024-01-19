@@ -1,6 +1,5 @@
 import { firestore } from "firebase-admin";
 import Stripe from "stripe";
-import { MainVariables } from "../../config";
 import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
@@ -43,8 +42,8 @@ export default onCall(async (request) => {
 
   try {
     // Initialize Stripe
-    const stripe = new Stripe(MainVariables.stripeSecretKey, {
-      apiVersion: "2020-08-27",
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2023-10-16",
       // Register extension as a Stripe plugin
       // https://stripe.com/docs/building-plugins#setappinfo
       appInfo: {

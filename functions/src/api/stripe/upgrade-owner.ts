@@ -5,7 +5,6 @@ import {
 } from "@rodez97/types-helpers";
 import { firestore } from "firebase-admin";
 import Stripe from "stripe";
-import { MainVariables } from "../../config";
 import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
 import { handleError } from "../../services/handleError";
 import { PartialWithFieldValue } from "firebase-admin/firestore";
@@ -34,8 +33,8 @@ export default onCall(async (request) => {
   }
 
   // Initialize Stripe
-  const stripe = new Stripe(MainVariables.stripeSecretKey, {
-    apiVersion: "2020-08-27",
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2023-10-16",
     // Register extension as a Stripe plugin
     // https://stripe.com/docs/building-plugins#setappinfo
     appInfo: {
@@ -106,7 +105,7 @@ export default onCall(async (request) => {
     // Create the subscription
     const subscription = await stripe.subscriptions.create({
       customer: userUpdates.customerId,
-      items: [{ price: MainVariables.stripePriceId, quantity: 0 }],
+      items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 0 }],
       metadata: {
         firebaseUID: uid,
       },
@@ -135,7 +134,7 @@ export default onCall(async (request) => {
         subscriptionId: userUpdates.subscriptionId,
         locations: 0,
         subItemId: subscription.items.data[0].id,
-        subscriptionStatus: subscription.status,
+        subscriptionStatus: subscription.status as any,
         limits: {
           storage: "5e+9",
         },

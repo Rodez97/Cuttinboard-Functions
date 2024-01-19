@@ -1,13 +1,16 @@
 import { credential, firestore } from "firebase-admin";
 import { initializeApp } from "firebase-admin/app";
-import { CREDENTIALS } from "./config";
 import { exportFunctions } from "better-firebase-functions";
 import { camelCase } from "lodash";
 
 initializeApp({
-  credential: credential.cert(CREDENTIALS),
-  databaseURL: "https://cuttinboard-2021-default-rtdb.firebaseio.com",
-  storageBucket: "cuttinboard-2021.appspot.com",
+  credential: credential.cert({
+    projectId: process.env.SERVICE_ACCOUNT_PROJECT_ID,
+    clientEmail: process.env.SERVICE_ACCOUNT_CLIENT_EMAIL,
+    privateKey: process.env.SERVICE_ACCOUNT_PRIVATE_KEY,
+  }),
+  databaseURL: process.env.FIREBASE_DATABASE_URL,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
 });
 firestore().settings({ ignoreUndefinedProperties: true });
 

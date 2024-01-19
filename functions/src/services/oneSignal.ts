@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig } from "axios";
-import { MainVariables } from "../config";
 import { logger } from "firebase-functions";
 
 export interface INotificationObject {
@@ -47,7 +46,7 @@ export const sendNotificationToUids = async (
     url: "https://onesignal.com/api/v1/notifications",
     headers: {
       accept: "application/json",
-      Authorization: `Basic ${MainVariables.oneSignalAppKey}`,
+      Authorization: `Basic ${process.env.ONE_SIGNAL_APP_KEY}`,
       "content-type": "application/json",
     },
     data: JSON.stringify(notification),

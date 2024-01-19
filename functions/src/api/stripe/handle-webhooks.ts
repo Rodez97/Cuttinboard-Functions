@@ -1,5 +1,4 @@
 import Stripe from "stripe";
-import { MainVariables } from "../../config";
 import { handleError } from "../../services/handleError";
 import {
   createProductRecord,
@@ -14,8 +13,8 @@ import {
 import { firestore } from "firebase-admin";
 import { HttpsError, onRequest } from "firebase-functions/v2/https";
 
-const stripe = new Stripe(MainVariables.stripeSecretKey, {
-  apiVersion: "2020-08-27",
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16",
   // Register extension as a Stripe plugin
   // https://stripe.com/docs/building-plugins#setappinfo
   appInfo: {
@@ -101,7 +100,7 @@ export default onRequest({ cors: [/stripe/] }, async (req, resp) => {
       req.rawBody,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       req.headers["stripe-signature"]!,
-      MainVariables.stripeWebhookSecret
+      process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (error) {
     resp.status(401).send("Webhook Error: Invalid Secret");

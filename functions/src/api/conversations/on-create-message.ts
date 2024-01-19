@@ -1,6 +1,5 @@
 import { IMessage } from "@rodez97/types-helpers";
 import { database, firestore } from "firebase-admin";
-import { MainVariables } from "../../config";
 import { conversationConverter } from "../../models/converters/directMessageConverter";
 import {
   INotificationObject,
@@ -87,14 +86,14 @@ export default functions.firestore
       if (unmutedMembers.length > 0) {
         const notification: INotificationObject = {
           include_external_user_ids: unmutedMembers,
-          app_id: MainVariables.oneSignalAppId,
+          app_id: process.env.ONE_SIGNAL_APP_ID,
           contents: {
             en: text ? text : image ? "📷 New image" : "New message",
           },
           headings: {
             en: `💬 ${senderName} (${conversationDocumentData.name})`,
           },
-          android_channel_id: MainVariables.messageBoardsChannelId,
+          android_channel_id: process.env.MESSAGE_BOARDS_CHANNEL_ID,
           thread_id: chatId,
           android_group: chatId,
           summary_arg: conversationDocumentData.name,

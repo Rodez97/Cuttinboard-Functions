@@ -3,7 +3,6 @@ import { auth, logger } from "firebase-functions";
 import { deleteFiles } from "../../services/deleteFiles";
 import { updateUserMetadata } from "../../services/updateUserMetadata";
 import Stripe from "stripe";
-import { MainVariables } from "../../config";
 import {
   employeeDocConverter,
   orgEmployeeConverter,
@@ -57,7 +56,7 @@ export default auth.user().onDelete(async (user) => {
 const deleteStripeCustomer = async (email: string) => {
   try {
     // Initialize Stripe
-    const stripe = new Stripe(MainVariables.stripeSecretKey, {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: "2023-10-16",
       // Register extension as a Stripe plugin
       // https://stripe.com/docs/building-plugins#setappinfo
