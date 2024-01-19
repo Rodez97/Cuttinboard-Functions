@@ -27,22 +27,44 @@ env:
   STORAGE_BUCKET: ${{ vars.STORAGE_BUCKET }} # The URL of the storage bucket
 
 jobs:
-  deploy_live_website:
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repo
+        uses: actions/checkout@master
       # Add any build steps here. For example:
       # - run: npm ci && npm run build
       - name: Use Node 18.x
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@master
         with:
           node-version: 18.x
       - name: Authenticate with private NPM package
         run: echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
       - name: Install dependencies
-        run: cd functions && npm ci
-      - name: Deploy functions
-        uses: aronep6/action-functions-deploy@v1.0.0
+        run: cd functions && npm install
+      - name: Build
+        run: cd functions && npm run build
+      - name: Archive Production Artifact
+        uses: actions/upload-artifact@master
         with:
-          serviceAccountKey: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_CUTTINBOARD }}"
-          projectId: "${{ env.PROJECT_ID }}"
+          name: dist
+          path: dist
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@master
+      - name: Download Artifact
+        uses: actions/download-artifact@master
+        with:
+          name: dist
+          path: dist
+      - name: Deploy to Firebase
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only functions
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
