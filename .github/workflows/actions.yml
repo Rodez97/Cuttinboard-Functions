@@ -18,7 +18,7 @@ jobs:
       # Add any build steps here. For example:
       # - run: npm ci && npm run build
       - name: Authenticate with private NPM package
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+        run: echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
       - name: Install dependencies
         run: cd functions && npm ci
       - name: Deploy functions
