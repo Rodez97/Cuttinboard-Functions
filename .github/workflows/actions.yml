@@ -1,0 +1,23 @@
+name: Deploy Cloud Functions
+
+on:
+  push:
+    branches:
+      - main
+    # Optionally configure to run only for specific files. For example:
+    # paths:
+    # - "website/**"
+env:
+  PROJECT_ID: cuttinboard-2021 # The ID of your Firebase/GCP project
+
+jobs:
+  deploy_live_website:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Add any build steps here. For example:
+      # - run: npm ci && npm run build
+      - uses: aronep6/action-functions-deploy@v1.0.0
+        with:
+          serviceAccountKey: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_CUTTINBOARD }}"
+          projectId: "${{ env.PROJECT_ID }}"

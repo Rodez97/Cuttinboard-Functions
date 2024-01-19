@@ -197,7 +197,7 @@ export const manageSubscriptionStatusChange = async (
 
   // Update with new Subscription status & details
   const subscriptionDetails: Subscription = {
-    status: subscription.status,
+    status: subscription.status as any,
     stripeLink: `https://dashboard.stripe.com${
       subscription.livemode ? "" : "/test"
     }/subscriptions/${subscription.id}`,
@@ -260,7 +260,7 @@ export const manageSubscriptionStatusChange = async (
 
     const members = await getMembersAndUpdateStatus(
       bulkWriter,
-      subscription.status,
+      subscription.status as LocationSubscriptionStatus,
       needToClean,
       organizationId
     );

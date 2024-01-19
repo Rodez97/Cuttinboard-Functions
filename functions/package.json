@@ -1,5 +1,6 @@
 {
   "name": "firestore-functions-cuttinboard",
+  "version": "0.0.1",
   "scripts": {
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
@@ -10,19 +11,20 @@
     "generate-readme": "firebase ext:info .. --markdown > ../README.md"
   },
   "engines": {
-    "node": "20"
+    "node": "16"
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@rodez97/types-helpers": "^1.0.0",
+    "@rodez97/types-helpers": "^1.0.1",
     "@sendinblue/client": "^3.3.1",
     "axios": "^0.24.0",
     "better-firebase-functions": "^4.0.0",
     "date-fns": "^2.30.0",
     "dayjs": "^1.11.10",
     "dayjs-recur": "^1.0.1",
+    "dotenv": "^16.3.2",
     "expo-server-sdk": "^3.7.0",
-    "firebase-admin": "^12.0.0",
+    "firebase-admin": "^11.11.1",
     "firebase-functions": "^4.6.0",
     "lodash": "^4.17.21",
     "short-uuid": "^4.2.2",
@@ -31,9 +33,9 @@
   },
   "devDependencies": {
     "@types/dayjs-recur": "^1.0.4",
+    "@types/lodash": "^4.14.202",
     "@types/node": "^20.11.5",
     "@types/request": "^2.48.12",
-    "firebase-functions-test": "^3.1.0",
     "ts-node": "^10.9.2",
     "tslib": "^2.6.2",
     "typescript": "^4.9.5"

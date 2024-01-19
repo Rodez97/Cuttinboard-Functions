@@ -1,16 +1,17 @@
-import { credential, firestore } from "firebase-admin";
-import { initializeApp } from "firebase-admin/app";
+import "dotenv/config";
+import { firestore } from "firebase-admin";
+import { cert, initializeApp } from "firebase-admin/app";
 import { exportFunctions } from "better-firebase-functions";
 import { camelCase } from "lodash";
 
 initializeApp({
-  credential: credential.cert({
+  credential: cert({
     projectId: process.env.SERVICE_ACCOUNT_PROJECT_ID,
     clientEmail: process.env.SERVICE_ACCOUNT_CLIENT_EMAIL,
     privateKey: process.env.SERVICE_ACCOUNT_PRIVATE_KEY,
   }),
-  databaseURL: process.env.FIREBASE_DATABASE_URL,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  databaseURL: process.env.DATABASE_URL,
+  storageBucket: process.env.STORAGE_BUCKET,
 });
 firestore().settings({ ignoreUndefinedProperties: true });
 

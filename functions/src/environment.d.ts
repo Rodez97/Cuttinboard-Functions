@@ -6,7 +6,7 @@ declare global {
       MESSAGING_SENDER_ID: string;
       API_KEY: string;
       MESSAGING_KEY: string;
-      FIREBASE_CUTTINBOARD_ACCESS_TOKEN: string;
+      CUTTINBOARD_ACCESS_TOKEN: string;
       TRANSACTIONAL_EMAILS_API_KEY: string;
       ONE_SIGNAL_APP_KEY: string;
       ONE_SIGNAL_USER_AUTH_KEY: string;
@@ -19,8 +19,8 @@ declare global {
       SERVICE_ACCOUNT_PROJECT_ID: string;
       SERVICE_ACCOUNT_CLIENT_EMAIL: string;
       SERVICE_ACCOUNT_PRIVATE_KEY: string;
-      FIREBASE_DATABASE_URL: string;
-      FIREBASE_STORAGE_BUCKET: string;
+      DATABASE_URL: string;
+      STORAGE_BUCKET: string;
     }
   }
 }
