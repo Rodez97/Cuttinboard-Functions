@@ -2,12 +2,13 @@ import { firestore, storage } from "firebase-admin";
 import * as functions from "firebase-functions";
 import { locationConverter } from "../../models/converters/locationConverter";
 import { organizationConverter } from "../../models/converters/organizationConverter";
+import { onObjectFinalized } from "firebase-functions/v2/storage";
 
-export default functions.storage.object().onFinalize(async (object) => {
-  const filePath = object.name;
+export default onObjectFinalized(async (event) => {
+  const filePath = event.data.name;
 
   // Size of the file
-  const fileSize = Number(object.size);
+  const fileSize = Number(event.data.size);
 
   // Regex to get the information from the file path (organizationId, locationId, drawerId, fileName)
   const regexLocationStoragePath =
