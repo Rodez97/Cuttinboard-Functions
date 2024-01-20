@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@master
         with:
           name: lib
-          path: lib
+          path: functions/lib
   deploy:
     name: Deploy
     needs: build
