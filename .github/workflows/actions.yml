@@ -34,6 +34,12 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@master
+      # Environment variables
+      - name: create env file
+        run: |
+          cd functions
+          touch .env
+          echo "${{ secrets.ENV_VARS }}" >> functions/.env
       - name: Use Node 18.x
         uses: actions/setup-node@master
         with:
