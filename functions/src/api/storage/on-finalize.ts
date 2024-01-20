@@ -4,53 +4,56 @@ import { locationConverter } from "../../models/converters/locationConverter";
 import { organizationConverter } from "../../models/converters/organizationConverter";
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 
-export default onObjectFinalized(async (event) => {
-  const filePath = event.data.name;
+export default onObjectFinalized(
+  { bucket: "cuttinboard-2021.appspot.com" },
+  async (event) => {
+    const filePath = event.data.name;
 
-  // Size of the file
-  const fileSize = Number(event.data.size);
+    // Size of the file
+    const fileSize = Number(event.data.size);
 
-  // Regex to get the information from the file path (organizationId, locationId, drawerId, fileName)
-  const regexLocationStoragePath =
-    /^locations\/([\w\-_]+)\/files\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
+    // Regex to get the information from the file path (organizationId, locationId, drawerId, fileName)
+    const regexLocationStoragePath =
+      /^locations\/([\w\-_]+)\/files\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
 
-  const regexGlobalStoragePath =
-    /^organizations\/([\w\-_]+)\/files\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
+    const regexGlobalStoragePath =
+      /^organizations\/([\w\-_]+)\/files\/([\w\-_]+)\/(\w+.[\w\-_]{1,4})/i;
 
-  if (filePath && regexGlobalStoragePath.test(filePath)) {
-    const matches = filePath.match(regexGlobalStoragePath);
+    if (filePath && regexGlobalStoragePath.test(filePath)) {
+      const matches = filePath.match(regexGlobalStoragePath);
 
-    if (!matches) {
-      return;
+      if (!matches) {
+        return;
+      }
+
+      const [organizationId, drawerId, fileName] = matches.slice(1); // Organization ID, Drawer ID, File name
+      await updateGlobalUsage(
+        organizationId,
+        fileSize,
+        drawerId,
+        fileName,
+        filePath
+      );
     }
 
-    const [organizationId, drawerId, fileName] = matches.slice(1); // Organization ID, Drawer ID, File name
-    await updateGlobalUsage(
-      organizationId,
-      fileSize,
-      drawerId,
-      fileName,
-      filePath
-    );
-  }
+    if (filePath && regexLocationStoragePath.test(filePath)) {
+      const matches = filePath.match(regexLocationStoragePath);
 
-  if (filePath && regexLocationStoragePath.test(filePath)) {
-    const matches = filePath.match(regexLocationStoragePath);
+      if (!matches) {
+        return;
+      }
 
-    if (!matches) {
-      return;
+      const [locationId, drawerId, fileName] = matches.slice(1); // Organization ID, Drawer ID, File name
+      await updateLocationUsage(
+        locationId,
+        fileSize,
+        drawerId,
+        fileName,
+        filePath
+      );
     }
-
-    const [locationId, drawerId, fileName] = matches.slice(1); // Organization ID, Drawer ID, File name
-    await updateLocationUsage(
-      locationId,
-      fileSize,
-      drawerId,
-      fileName,
-      filePath
-    );
   }
-});
+);
 
 async function updateGlobalUsage(
   organizationId: string,
