@@ -3,6 +3,7 @@ import { firestore } from "firebase-admin";
 import { cert, initializeApp } from "firebase-admin/app";
 import { exportFunctions } from "better-firebase-functions";
 import { camelCase } from "lodash";
+import { setGlobalOptions } from "firebase-functions/v2/options";
 
 initializeApp({
   credential: cert({
@@ -14,6 +15,10 @@ initializeApp({
   storageBucket: process.env.STORAGE_BUCKET,
 });
 firestore().settings({ ignoreUndefinedProperties: true });
+
+setGlobalOptions({
+  maxInstances: 10,
+});
 
 exportFunctions({
   __filename,
