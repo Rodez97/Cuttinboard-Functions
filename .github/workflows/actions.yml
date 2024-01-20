@@ -38,8 +38,7 @@ jobs:
       - name: create env file
         run: |
           cd functions
-          touch .env
-          echo "${{ secrets.ENV_VARS }}" >> functions/.env
+          echo "${{ secrets.ENV_VARS }}" > ~/.env
       - name: Use Node 18.x
         uses: actions/setup-node@master
         with:
