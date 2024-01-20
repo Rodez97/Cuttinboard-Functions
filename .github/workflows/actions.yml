@@ -9,22 +9,6 @@ on:
     # - "website/**"
 env:
   PROJECT_ID: cuttinboard-2021 # The ID of your Firebase/GCP project
-  STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }} # The Stripe secret key for your account
-  STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }} # The webhook secret for your Stripe account
-  API_KEY: ${{ secrets.API_KEY }} # The API key for your application
-  TRANSACTIONAL_EMAILS_API_KEY: ${{ secrets.TRANSACTIONAL_EMAILS_API_KEY }} # The API key for your transactional emails provider
-  ONE_SIGNAL_APP_KEY: ${{ secrets.ONE_SIGNAL_APP_KEY }} # The OneSignal app key for your application
-  ONE_SIGNAL_USER_AUTH_KEY: ${{ secrets.ONE_SIGNAL_USER_AUTH_KEY }} # The OneSignal user auth key for your application
-  ONE_SIGNAL_APP_ID: ${{ vars.ONE_SIGNAL_APP_ID }} # The OneSignal app ID for your application
-  STRIPE_PRICE_ID: ${{ vars.STRIPE_PRICE_ID }} # The Stripe price ID for your application
-  SCHEDULE_CHANNEL_ID: ${{ vars.SCHEDULE_CHANNEL_ID }} # The ID of the channel where the schedule messages will be sent
-  MESSAGE_BOARDS_CHANNEL_ID: ${{ vars.MESSAGE_BOARDS_CHANNEL_ID }} # The ID of the channel where the message boards messages will be sent
-  DIRECT_MESSAGES_CHANNEL_ID: ${{ vars.DIRECT_MESSAGES_CHANNEL_ID }} # The ID of the channel where the direct messages will be sent
-  SERVICE_ACCOUNT_PROJECT_ID: ${{ secrets.SERVICE_ACCOUNT_PROJECT_ID }} # The ID of the project where the service account is located
-  SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.SERVICE_ACCOUNT_CLIENT_EMAIL }} # The client email of the service account
-  SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.SERVICE_ACCOUNT_PRIVATE_KEY }} # The private key of the service account
-  DATABASE_URL: ${{ vars.DATABASE_URL }} # The URL of the database
-  STORAGE_BUCKET: ${{ vars.STORAGE_BUCKET }} # The URL of the storage bucket
   GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
 
 jobs:
@@ -35,11 +19,26 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@master
       # Environment variables
-      - name: create env file
-        run: |
-          cd functions
-          touch .env
-          echo "${{ secrets.ENV_VARS }}" >> .env
+      - name: Make envfile
+        uses: SpicyPizza/create-envfile@v2.0
+        with:
+          envkey_STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          envkey_STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          envkey_API_KEY: ${{ secrets.API_KEY }}
+          envkey_TRANSACTIONAL_EMAILS_API_KEY: ${{ secrets.TRANSACTIONAL_EMAILS_API_KEY }}
+          envkey_ONE_SIGNAL_APP_KEY: ${{ secrets.ONE_SIGNAL_APP_KEY }}
+          envkey_ONE_SIGNAL_USER_AUTH_KEY: ${{ secrets.ONE_SIGNAL_USER_AUTH_KEY }}
+          envkey_ONE_SIGNAL_APP_ID: ${{ vars.ONE_SIGNAL_APP_ID }}
+          envkey_STRIPE_PRICE_ID: ${{ vars.STRIPE_PRICE_ID }}
+          envkey_SCHEDULE_CHANNEL_ID: ${{ vars.SCHEDULE_CHANNEL_ID }}
+          envkey_MESSAGE_BOARDS_CHANNEL_ID: ${{ vars.MESSAGE_BOARDS_CHANNEL_ID }}
+          envkey_DIRECT_MESSAGES_CHANNEL_ID: ${{ vars.DIRECT_MESSAGES_CHANNEL_ID }}
+          envkey_SERVICE_ACCOUNT_PROJECT_ID: ${{ secrets.SERVICE_ACCOUNT_PROJECT_ID }}
+          envkey_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.SERVICE_ACCOUNT_CLIENT_EMAIL }}
+          envkey_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.SERVICE_ACCOUNT_PRIVATE_KEY }}
+          envkey_DATABASE_URL: ${{ vars.DATABASE_URL }}
+          envkey_STORAGE_BUCKET: ${{ vars.STORAGE_BUCKET }}
+          directory: functions
       - name: Use Node 18.x
         uses: actions/setup-node@master
         with:
