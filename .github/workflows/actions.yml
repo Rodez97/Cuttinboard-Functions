@@ -44,7 +44,9 @@ jobs:
         with:
           node-version: 18.x
       - name: Authenticate with private NPM package
-        run: echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+        run: |
+          cd functions
+          echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
       - name: Install dependencies
         run: cd functions && npm install
       - name: Deploy to Firebase
