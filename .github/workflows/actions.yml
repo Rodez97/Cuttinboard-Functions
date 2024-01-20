@@ -57,6 +57,14 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@master
+      - name: Use Node 18.x
+        uses: actions/setup-node@master
+        with:
+          node-version: 18.x
+      - name: Authenticate with private NPM package
+        run: echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+      - name: Install dependencies
+        run: cd functions && npm install
       - name: Download Artifact
         uses: actions/download-artifact@master
         with:
