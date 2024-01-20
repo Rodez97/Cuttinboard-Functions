@@ -46,7 +46,11 @@ jobs:
       - name: Authenticate with private NPM package
         run: |
           cd functions
-          echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          touch .npmrc
+          echo registry=https://registry.npmjs.org/ >> .npmrc
+          echo @rodez97:registry=https://npm.pkg.github.com/ >> .npmrc
+          echo //npm.pkg.github.com/:_authToken=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 >> .npmrc
+          cat .npmrc
       - name: Install dependencies
         run: cd functions && npm install
       - name: Deploy to Firebase
