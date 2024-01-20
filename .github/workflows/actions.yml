@@ -25,34 +25,11 @@ env:
   SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.SERVICE_ACCOUNT_PRIVATE_KEY }} # The private key of the service account
   DATABASE_URL: ${{ vars.DATABASE_URL }} # The URL of the database
   STORAGE_BUCKET: ${{ vars.STORAGE_BUCKET }} # The URL of the storage bucket
+  GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@master
-      # Add any build steps here. For example:
-      # - run: npm ci && npm run build
-      - name: Use Node 18.x
-        uses: actions/setup-node@master
-        with:
-          node-version: 18.x
-      - name: Authenticate with private NPM package
-        run: echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-      - name: Install dependencies
-        run: cd functions && npm install
-      - name: Build
-        run: cd functions && npm run build
-      - name: Archive Production Artifact
-        uses: actions/upload-artifact@master
-        with:
-          name: lib
-          path: functions/lib
   deploy:
     name: Deploy
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -65,14 +42,7 @@ jobs:
         run: echo "${{ secrets.NPM_TOKEN }}" > ~/.npmrc
       - name: Install dependencies
         run: cd functions && npm install
-      - name: Download Artifact
-        uses: actions/download-artifact@master
-        with:
-          name: lib
-          path: lib
       - name: Deploy to Firebase
         uses: w9jds/firebase-action@master
         with:
           args: deploy --only functions
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
