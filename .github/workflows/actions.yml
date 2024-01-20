@@ -22,7 +22,7 @@ jobs:
       - name: Make envfile
         uses: SpicyPizza/create-envfile@v2.0
         with:
-          envkey_STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          envkey_STRIPE_SECRET_KEY: "${{ secrets.STRIPE_SECRET_KEY }}"
           envkey_STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           envkey_API_KEY: ${{ secrets.API_KEY }}
           envkey_TRANSACTIONAL_EMAILS_API_KEY: ${{ secrets.TRANSACTIONAL_EMAILS_API_KEY }}
@@ -33,9 +33,9 @@ jobs:
           envkey_SCHEDULE_CHANNEL_ID: ${{ vars.SCHEDULE_CHANNEL_ID }}
           envkey_MESSAGE_BOARDS_CHANNEL_ID: ${{ vars.MESSAGE_BOARDS_CHANNEL_ID }}
           envkey_DIRECT_MESSAGES_CHANNEL_ID: ${{ vars.DIRECT_MESSAGES_CHANNEL_ID }}
-          envkey_SERVICE_ACCOUNT_PROJECT_ID: ${{ secrets.SERVICE_ACCOUNT_PROJECT_ID }}
-          envkey_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.SERVICE_ACCOUNT_CLIENT_EMAIL }}
-          envkey_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.SERVICE_ACCOUNT_PRIVATE_KEY }}
+          envkey_SERVICE_ACCOUNT_PROJECT_ID: "${{ secrets.SERVICE_ACCOUNT_PROJECT_ID }}"
+          envkey_SERVICE_ACCOUNT_CLIENT_EMAIL: "${{ secrets.SERVICE_ACCOUNT_CLIENT_EMAIL }}"
+          envkey_SERVICE_ACCOUNT_PRIVATE_KEY: "${{ secrets.SERVICE_ACCOUNT_PRIVATE_KEY }}"
           envkey_DATABASE_URL: ${{ vars.DATABASE_URL }}
           envkey_STORAGE_BUCKET: ${{ vars.STORAGE_BUCKET }}
           directory: functions
