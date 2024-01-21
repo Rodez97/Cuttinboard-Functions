@@ -8,7 +8,7 @@ import { locationConverter } from "../../../models/converters/locationConverter"
 /**
  * Add a new employee to the organization or location
  */
-export default onCall<string>(async (request) => {
+export default onCall<string>({ cors: true }, async (request) => {
   const { auth, data: locationId } = request;
 
   if (!auth) {

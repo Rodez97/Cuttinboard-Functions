@@ -15,7 +15,7 @@ interface SelectKeyData {
 /**
  * Select a key for a user to access a location or organization.
  */
-export default onCall<SelectKeyData>(async (event) => {
+export default onCall<SelectKeyData>({ cors: true }, async (event) => {
   const { organizationId, locationId, timestamp } = event.data;
   const authentication = event.auth;
 

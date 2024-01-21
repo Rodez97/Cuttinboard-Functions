@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { cuttinboardUserConverter } from "../../models/converters/cuttinboardUserConverter";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-export default onCall(async (request) => {
+export default onCall({ cors: true }, async (request) => {
   const { auth } = request;
 
   if (!auth) {
