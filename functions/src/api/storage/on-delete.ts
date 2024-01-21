@@ -1,11 +1,12 @@
 import { firestore } from "firebase-admin";
-import * as functions from "firebase-functions";
+import { logger } from "firebase-functions/v1";
+import { onObjectDeleted } from "firebase-functions/v2/storage";
 
-export default functions.storage.object().onDelete(async (object) => {
-  const filePath = object.name;
+export default onObjectDeleted(async (event) => {
+  const filePath = event.data.name;
 
   // Size of the file
-  const fileSize = Number(object.size);
+  const fileSize = Number(event.data.size);
 
   // Regex to get the information from the file path (organizationId, locationId, drawerId, fileName)
   const regexLocationStoragePath =
@@ -47,6 +48,6 @@ export default functions.storage.object().onDelete(async (object) => {
       return;
     }
   } catch (error: any) {
-    functions.logger.error(error);
+    logger.error(error);
   }
 });
