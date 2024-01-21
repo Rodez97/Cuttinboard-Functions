@@ -12,7 +12,7 @@ export interface EmployeeData {
 /**
  * Add a new employee to the organization or location
  */
-export default onCall<EmployeeData>(async (request) => {
+export default onCall<EmployeeData>({ cors: true }, async (request) => {
   const { auth, data } = request;
 
   if (!auth) {

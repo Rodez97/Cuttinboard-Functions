@@ -11,7 +11,7 @@ import { PartialWithFieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { organizationConverter } from "../../models/converters/organizationConverter";
 
-export default onCall(async (request) => {
+export default onCall({ cors: true }, async (request) => {
   const { auth } = request;
 
   if (!auth) {
