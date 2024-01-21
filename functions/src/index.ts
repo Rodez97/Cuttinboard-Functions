@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { firestore } from "firebase-admin";
+import { firestore, storage } from "firebase-admin";
 import { cert, initializeApp } from "firebase-admin/app";
 import { exportFunctions } from "better-firebase-functions";
 import { camelCase } from "lodash";
@@ -12,9 +12,11 @@ initializeApp({
     privateKey: process.env.SERVICE_ACCOUNT_PRIVATE_KEY,
   }),
   databaseURL: process.env.DATABASE_URL,
-  storageBucket: process.env.STORAGE_BUCKET,
+  storageBucket: "cuttinboard-2021.appspot.com",
 });
 firestore().settings({ ignoreUndefinedProperties: true });
+
+storage().bucket("cuttinboard-2021.appspot.com");
 
 setGlobalOptions({
   maxInstances: 10,

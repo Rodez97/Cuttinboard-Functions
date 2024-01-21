@@ -5,7 +5,7 @@ import { organizationConverter } from "../../models/converters/organizationConve
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 
 export default onObjectFinalized(
-  { bucket: "cuttinboard-2021.appspot.com" },
+  { bucket: "cuttinboard-2021.appspot.com", region: "nam5" },
   async (event) => {
     const filePath = event.data.name;
 
