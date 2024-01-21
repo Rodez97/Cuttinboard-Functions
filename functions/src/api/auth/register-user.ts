@@ -12,7 +12,7 @@ interface RegisterUserRequest {
 /**
  * Register a new user.
  */
-export default onCall<RegisterUserRequest>({ cors: false }, async (data) => {
+export default onCall<RegisterUserRequest>({ cors: true }, async (data) => {
   const { email, name, lastName, password } = data.data;
 
   // Check that the all the required fields are present.
