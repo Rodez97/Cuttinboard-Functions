@@ -39,10 +39,10 @@ jobs:
           envkey_DATABASE_URL: ${{ vars.DATABASE_URL }}
           envkey_STORAGE_BUCKET: ${{ vars.STORAGE_BUCKET }}
           directory: functions
-      - name: Use Node 18.x
+      - name: Use Node 16.x
         uses: actions/setup-node@master
         with:
-          node-version: 18.x
+          node-version: 16.x
       - name: Authenticate with private NPM package
         run: |
           cd functions
