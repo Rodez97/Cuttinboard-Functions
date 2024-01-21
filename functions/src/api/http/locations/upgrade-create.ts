@@ -21,12 +21,6 @@ import { logger } from "firebase-functions";
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2023-10-16",
-  // Register extension as a Stripe plugin
-  // https://stripe.com/docs/building-plugins#setappinfo
-  appInfo: {
-    name: "Cuttinboard-Firebase",
-    version: "0.1",
-  },
 });
 
 export default onCall<ICreateLocationData>({ cors: true }, async (request) => {
