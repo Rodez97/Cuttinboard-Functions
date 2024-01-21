@@ -9,7 +9,8 @@ on:
     # - "website/**"
 env:
   PROJECT_ID: cuttinboard-2021 # The ID of your Firebase/GCP project
-  GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+  # GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+  FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
 jobs:
   deploy:
