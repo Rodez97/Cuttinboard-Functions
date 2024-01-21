@@ -3,7 +3,7 @@ import { logger } from "firebase-functions/v1";
 import { onObjectDeleted } from "firebase-functions/v2/storage";
 
 export default onObjectDeleted(
-  { bucket: "cuttinboard-2021.appspot.com", region: "nam5" },
+  { bucket: "cuttinboard-2021.appspot.com" },
   async (event) => {
     const filePath = event.data.name;
 
